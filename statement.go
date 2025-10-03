@@ -470,6 +470,82 @@ func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driv
 	return &result{ra}, nil
 }
 
+func (s *Stmt) ColumnCount() (int, error) {
+	if s.closed {
+		return 0, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return 0, errUninitializedStmt
+	}
+
+	count := mapping.PreparedStatementColumnCount(*s.preparedStmt)
+	return int(count), nil
+}
+
+func (s *Stmt) GetColumnTypes() ([]Type, error) {
+	n, err := s.ColumnCount()
+	if err != nil {
+		return nil, err
+	}
+
+	types := make([]Type, n)
+	for i := range n {
+		t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(i+1))
+		types[i] = t
+	}
+	return types, nil
+}
+
+func (s *Stmt) GetColumnNames() ([]string, error) {
+	if s.closed {
+		return nil, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return nil, errUninitializedStmt
+	}
+
+	n, err := s.ColumnCount()
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, n)
+	for i := range n {
+		name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(i+1))
+		names[i] = name
+	}
+	return names, nil
+}
+
+func (s *Stmt) GetParameterTypes() ([]Type, error) {
+	if s.closed {
+		return nil, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return nil, errUninitializedStmt
+	}
+
+	count := mapping.NParams(*s.preparedStmt)
+	types := make([]Type, count)
+	for i := mapping.IdxT(0); i < count; i++ {
+		t := mapping.ParamType(*s.preparedStmt, i+1)
+		types[i] = t
+	}
+	return types, nil
+}
+
+func (s *Stmt) NParams() (int, error) {
+	if s.closed {
+		return 0, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return 0, errUninitializedStmt
+	}
+
+	count := mapping.NParams(*s.preparedStmt)
+	return int(count), nil
+}
+
 // ExecBound executes a bound query that doesn't return rows, such as an INSERT or UPDATE.
 // It can only be used after Bind has been called.
 // WARNING: This is a low-level API and should be used with caution.
