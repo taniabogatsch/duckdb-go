@@ -490,7 +490,7 @@ func (s *Stmt) GetColumnTypes() ([]Type, error) {
 
 	types := make([]Type, n)
 	for i := range n {
-		t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(i+1))
+		t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(i))
 		types[i] = t
 	}
 	return types, nil
@@ -511,7 +511,7 @@ func (s *Stmt) GetColumnNames() ([]string, error) {
 
 	names := make([]string, n)
 	for i := range n {
-		name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(i+1))
+		name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(i))
 		names[i] = name
 	}
 	return names, nil
