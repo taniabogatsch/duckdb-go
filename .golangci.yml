@@ -14,6 +14,7 @@ linters:
     - gochecknoinits
     - godot
     - godox
+    - gomoddirectives # TODO: Remove once replace in go.mod is gone
     - inamedparam
     - ireturn
     - lll

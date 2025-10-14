@@ -1,4 +1,4 @@
-module github.com/marcboeker/go-duckdb/arrowmapping
+module github.com/duckdb/duckdb-go/arrowmapping
 
 go 1.24
 

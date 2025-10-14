@@ -1,4 +1,4 @@
-module github.com/marcboeker/go-duckdb/mapping
+module github.com/duckdb/duckdb-go/mapping
 
 go 1.24
 

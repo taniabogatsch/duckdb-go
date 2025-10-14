@@ -12,7 +12,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/uuid"
-	"github.com/marcboeker/go-duckdb/mapping"
+
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // duckdb-go exports the following type wrappers:

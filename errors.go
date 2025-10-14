@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 func getError(errDriver, err error) error {
