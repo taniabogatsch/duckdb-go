@@ -18,12 +18,12 @@ Adhering to these guidelines is not a complete guarantee that your pull request 
 
 ### Testing
 
-`go-duckdb` aims to contain tests that are fast, cover a significant portion of the code, 
+`duckdb-go` aims to contain tests that are fast, cover a significant portion of the code, 
 are comprehensible, and can serve as documentation.
 
 ### Go Guidelines
 
-go-duckdb uses [Effective Go](https://go.dev/doc/effective_go) and the 
+duckdb-go uses [Effective Go](https://go.dev/doc/effective_go) and the 
 [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md) 
 for tips for writing clear, idiomatic Go code. Below are a few excerpts.
 

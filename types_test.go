@@ -306,7 +306,7 @@ func TestTypes(t *testing.T) {
 	require.Len(t, actualRows, len(expectedRows))
 }
 
-// NOTE: go-duckdb only contains very few benchmarks. The purpose of those benchmarks is to avoid regressions
+// NOTE: duckdb-go only contains very few benchmarks. The purpose of those benchmarks is to avoid regressions
 // of its main functionalities. I.e., functions related to implementing the database/sql interface.
 var benchmarkTypesResult []testTypesRow
 

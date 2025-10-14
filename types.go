@@ -15,7 +15,7 @@ import (
 	"github.com/marcboeker/go-duckdb/mapping"
 )
 
-// go-duckdb exports the following type wrappers:
+// duckdb-go exports the following type wrappers:
 // UUID, Map, Interval, Decimal, Union, Composite (optional, used to scan LIST and STRUCT).
 
 // Pre-computed reflect type values to avoid repeated allocations.
