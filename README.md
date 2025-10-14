@@ -1,6 +1,6 @@
 # Go SQL Driver For [DuckDB](https://github.com/duckdb/duckdb)
-![Tests status](https://github.com/marcboeker/go-duckdb/actions/workflows/tests.yaml/badge.svg)
-[![GoDoc](https://godoc.org/github.com/marcboeker/go-duckdb/v2?status.svg)](https://pkg.go.dev/github.com/marcboeker/go-duckdb/v2)
+![Tests status](https://github.com/duckdb/duckdb-go/actions/workflows/tests.yaml/badge.svg)
+[![GoDoc](https://godoc.org/github.com/duckdb/duckdb-go/v2?status.svg)](https://pkg.go.dev/github.com/duckdb/duckdb-go/v2)
 
 The DuckDB driver conforms to the built-in `database/sql` interface.
 
@@ -47,14 +47,14 @@ Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](http
 However, scanning into `any` (`driver.Value`) would cause the JSON string to contain escape characters and other unexpected behavior.
 
 It is now possible to scan into `any`, or directly into go-duckdb's `Composite` type,
-as shown in the [JSON example](https://github.com/marcboeker/go-duckdb/blob/main/examples/json/main.go).
+as shown in the [JSON example](https://github.com/duckdb/duckdb-go/blob/main/examples/json/main.go).
 Scanning directly into `string` or `[]byte` is no longer possible.
 A workaround is casting to `::VARCHAR` or `::BLOB` in DuckDB if you do not need to scan the result into a JSON interface.
 
 ## Installation
 
 ```sh
-go get github.com/marcboeker/go-duckdb/v2
+go get github.com/duckdb/duckdb-go/v2
 ```
 
 ### Windows

@@ -4,9 +4,8 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetGetPrimitive(t *testing.T) {

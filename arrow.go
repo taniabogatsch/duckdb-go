@@ -69,7 +69,6 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/cdata"
-
 	"github.com/marcboeker/go-duckdb/arrowmapping"
 	"github.com/marcboeker/go-duckdb/mapping"
 )
