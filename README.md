@@ -1,16 +1,16 @@
 # Go SQL Driver For [DuckDB](https://github.com/duckdb/duckdb)
-![Tests status](https://github.com/marcboeker/go-duckdb/actions/workflows/tests.yaml/badge.svg)
-[![GoDoc](https://godoc.org/github.com/marcboeker/go-duckdb/v2?status.svg)](https://pkg.go.dev/github.com/marcboeker/go-duckdb/v2)
+![Tests status](https://github.com/duckdb/duckdb-go/actions/workflows/tests.yaml/badge.svg)
+[![GoDoc](https://godoc.org/github.com/duckdb/duckdb-go/v2?status.svg)](https://pkg.go.dev/github.com/duckdb/duckdb-go/v2)
 
 The DuckDB driver conforms to the built-in `database/sql` interface.
 
 **Current DuckDB version: `v1.4.1`.**
 
-The first go-duckdb tag with that version is `v2.4.2`.
+The first duckdb-go tag with that version is `v2.4.2`.
 
 Previous DuckDB versions:
 
-| DuckDB   | go-duckdb |
+| DuckDB   | duckdb-go |
 |----------|-----------|
 | `v1.4.1` | `v2.4.2`  |
 | `v1.4.0` | `v2.4.0`  |
@@ -25,12 +25,12 @@ Previous DuckDB versions:
 ### Breaking Changes
 
 > [!WARNING]
-> Starting with `v2.0.0`, go-duckdb supports DuckDB `v1.2.0` and upward.
+> Starting with `v2.0.0`, duckdb-go supports DuckDB `v1.2.0` and upward.
 > Moving to `v2` includes the following list of breaking changes.
 
 #### Dropping pre-built FreeBSD support
 
-Starting with `v2`, go-duckdb drops pre-built FreeBSD support.
+Starting with `v2`, duckdb-go drops pre-built FreeBSD support.
 This change is because DuckDB does not publish any bundled FreeBSD libraries.
 Thus, you must build your static library for FreeBSD using the steps below.
 
@@ -46,15 +46,15 @@ The pre-built libraries ship DuckDB's JSON extension containing the `JSON` type.
 Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](https://cs.opensource.google/go/go/+/go1.24.1:src/database/sql/sql.go;l=3365).
 However, scanning into `any` (`driver.Value`) would cause the JSON string to contain escape characters and other unexpected behavior.
 
-It is now possible to scan into `any`, or directly into go-duckdb's `Composite` type,
-as shown in the [JSON example](https://github.com/marcboeker/go-duckdb/blob/main/examples/json/main.go).
+It is now possible to scan into `any`, or directly into duckdb-go's `Composite` type,
+as shown in the [JSON example](https://github.com/duckdb/duckdb-go/blob/main/examples/json/main.go).
 Scanning directly into `string` or `[]byte` is no longer possible.
 A workaround is casting to `::VARCHAR` or `::BLOB` in DuckDB if you do not need to scan the result into a JSON interface.
 
 ## Installation
 
 ```sh
-go get github.com/marcboeker/go-duckdb/v2
+go get github.com/duckdb/duckdb-go/v2
 ```
 
 ### Windows
@@ -81,7 +81,7 @@ You can use `go mod vendor` to make a copy of the third-party packages in this p
 
 _Note: For readability, we omit error handling in most examples._
 
-`go-duckdb` hooks into the `database/sql` interface provided by the Go `stdlib`.
+`duckdb-go` hooks into the `database/sql` interface provided by the Go `stdlib`.
 To open a connection, specify the driver type as `duckdb`.
 
 ```go
@@ -133,10 +133,10 @@ Please refer to the [database/sql](https://godoc.org/database/sql) documentation
 
 ## Linking DuckDB
 
-By default, `go-duckdb` statically links pre-built DuckDB libraries into your binary.
+By default, `duckdb-go` statically links pre-built DuckDB libraries into your binary.
 Statically linking DuckDB increases your binary size.
 
-`go-duckdb` bundles the following pre-compiled static libraries.
+`duckdb-go` bundles the following pre-compiled static libraries.
 - MacOS: amd64, arm64.
 - Linux: amd64, arm64.
 - Windows: amd64.
@@ -166,7 +166,7 @@ DuckDB's `bundle-library` Makefile target contains an example of `ar`, or you ca
 
 #### Note on FreeBSD
 
-Starting with `v2`, go-duckdb drops pre-built FreeBSD support.
+Starting with `v2`, duckdb-go drops pre-built FreeBSD support.
 This change is because DuckDB does not publish any bundled FreeBSD libraries.
 Thus, you must build your static library for FreeBSD using the steps above.
 
@@ -212,7 +212,7 @@ To enable CGO when cross-compiling, use `CC={C cross compiler} CGO_ENABLED=1 {co
 
 In the C API, DuckDB stores both `TIMESTAMP` and `TIMESTAMP_TZ` as `duckdb_timestamp`, which holds the number of
 microseconds elapsed since January 1, 1970, UTC (i.e., an instant without offset information).
-When passing a `time.Time` to go-duckdb, go-duckdb transforms it to an instant with `UnixMicro()`,
+When passing a `time.Time` to duckdb-go, duckdb-go transforms it to an instant with `UnixMicro()`,
 even when using `TIMESTAMP_TZ`. Later, scanning either type of value returns an instant, as SQL types do not model
 time zone information for individual values.
 
@@ -342,7 +342,7 @@ for rdr.Next() {
 
 ## DuckDB Extensions
 
-`go-duckdb` relies on the [`duckdb-go-bindings` module](https://github.com/duckdb/duckdb-go-bindings).
+`duckdb-go` relies on the [`duckdb-go-bindings` module](https://github.com/duckdb/duckdb-go-bindings).
 Any pre-built library in `duckdb-go-bindings` statically links the default extensions: ICU, JSON, Parquet, and Autocomplete.
 Additionally, automatic extension loading is enabled.
 

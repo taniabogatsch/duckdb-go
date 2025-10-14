@@ -23,7 +23,7 @@ import (
 	"runtime/cgo"
 	"unsafe"
 
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // ScalarFuncConfig contains the fields to configure a user-defined scalar function.

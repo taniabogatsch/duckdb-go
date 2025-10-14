@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 func getError(errDriver, err error) error {
@@ -84,7 +84,7 @@ const (
 )
 
 var (
-	errInternal   = errors.New("internal error: please file a bug report at go-duckdb")
+	errInternal   = errors.New("internal error: please file a bug report at duckdb-go")
 	errAPI        = errors.New("API error")
 	errVectorSize = errors.New("data chunks cannot exceed duckdb's internal vector size")
 
@@ -108,7 +108,7 @@ var (
 	errBeginTx                    = errors.New("could not begin transaction")
 	errMultipleTx                 = errors.New("multiple transactions")
 	errReadOnlyTxNotSupported     = errors.New("read-only transactions are not supported")
-	errIsolationLevelNotSupported = errors.New("isolation level not supported: go-duckdb only supports the default isolation level")
+	errIsolationLevelNotSupported = errors.New("isolation level not supported: duckdb-go only supports the default isolation level")
 
 	errAppenderCreation         = errors.New("could not create appender")
 	errAppenderClose            = errors.New("could not close appender")
