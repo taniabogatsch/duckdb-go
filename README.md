@@ -25,8 +25,9 @@ Previous DuckDB versions:
 
 ## Migration from marcboeker/go-duckdb
 
-Starting with `v2.4.3`, this project moved from `github.com/marcboeker/go-duckdb` to `github.com/duckdb/duckdb-go`.
-**All versions prior to `v2.4.3` use the old import paths.**
+**This project moved from `github.com/marcboeker/go-duckdb` to `github.com/duckdb/duckdb-go` starting with `v2.4.3`.**
+
+All versions prior to `v2.4.3` use the old import paths.
 
 To migrate:
 
@@ -45,7 +46,24 @@ gofmt -w -r '"github.com/marcboeker/go-duckdb/arrowmapping" -> "github.com/duckd
 go mod tidy
 ```
 
-### Breaking Changes
+### Background
+
+Over the last few years, the Go client has become a [primary DuckDB client](https://duckdb.org/docs/stable/clients/overview).
+We'd like to thank [Marc Boeker](https://github.com/marcboeker) for all his work on creating this driver and implementing the various interfaces of the `database/sql` package!
+We'd also like to thank all the other external contributors for their various PRs and other contributions.
+
+With the driver being a primary DuckDB client, over the last years, the DuckDB team has gradually increased its involvement in the maintenance of the driver,
+to guarantee that it is constantly updated and that its critical bugs (e.g., crashes) are fixed.
+Now, we have a Long-Term Support release, so starting from early next year, we will have two releases in parallel (v1.4 LTS and v1.5).
+Additionally, more DuckDB customers use and rely on the Go client, which necessitates prioritization of certain features from us.
+
+These points all add to the maintenance work, which the DuckDB team is happy to perform!
+However, the motivation behind this fork, which is a joint effort of Marc Boeker and the DuckDB team,
+is to fully transfer the maintenance and day-to-day work of the driver to the DuckDB team.
+That being said, DuckDB Go client has become what it is also due to its many contributions from the community,
+and we are looking forward to your future PRs, issues, and discussions!
+
+## Breaking Changes
 
 > [!WARNING]
 > Starting with `v2.0.0`, duckdb-go supports DuckDB `v1.2.0` and upward.
