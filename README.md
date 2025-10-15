@@ -25,15 +25,15 @@ Previous DuckDB versions:
 
 ## Migration from marcboeker/go-duckdb
 
-**This project moved from `github.com/marcboeker/go-duckdb` to `github.com/duckdb/duckdb-go` starting with `v2.4.3`.**
+**This project moved from `github.com/marcboeker/go-duckdb` to `github.com/duckdb/duckdb-go` starting with `v2.5.0`.**
 
-All versions prior to `v2.4.3` use the old import paths.
+All versions prior to `v2.5.0` use the old import paths.
 
 To migrate:
 
 ```sh
 # Update dependency
-go get github.com/duckdb/duckdb-go/v2@v2.4.3
+go get github.com/duckdb/duckdb-go/v2@v2.5.0
 
 # Rewrite import paths
 gofmt -w -r '"github.com/marcboeker/go-duckdb/v2" -> "github.com/duckdb/duckdb-go/v2"' .
