@@ -53,14 +53,14 @@ We'd like to thank [Marc Boeker](https://github.com/marcboeker) for all his work
 We'd also like to thank all the other external contributors for their various PRs and other contributions.
 
 With the driver being a primary DuckDB client, over the last years, the DuckDB team has gradually increased its involvement in the maintenance of the driver,
-to guarantee that it is constantly updated and that its critical bugs (e.g., crashes) are fixed.
-Now, we have a Long-Term Support release, so starting from early next year, we will have two releases in parallel (v1.4 LTS and v1.5).
+to guarantee that it is constantly updated and that critical bugs (e.g., crashes) are fixed.
+Now we have a Long-Term Support release, so starting from early next year, we will have two releases in parallel (v1.4 LTS and v1.5).
 Additionally, more DuckDB customers use and rely on the Go client, which necessitates prioritization of certain features from us.
 
 These points all add to the maintenance work, which the DuckDB team is happy to perform!
 However, the motivation behind this fork, which is a joint effort of Marc Boeker and the DuckDB team,
 is to fully transfer the maintenance and day-to-day work of the driver to the DuckDB team.
-That being said, DuckDB Go client has become what it is also due to its many contributions from the community,
+That being said, the DuckDB Go client has become what it is also due to its many contributions from the community,
 and we are looking forward to your future PRs, issues, and discussions!
 
 ## Breaking Changes
