@@ -38,7 +38,7 @@ go get github.com/duckdb/duckdb-go/v2@v2.5.0
 # Rewrite import paths
 gofmt -w -r '"github.com/marcboeker/go-duckdb/v2" -> "github.com/duckdb/duckdb-go/v2"' .
 
-# If you use the mapping or arrowmapping submodules, also run:
+# If you use the mapping or arrowmapping submodules, also run
 gofmt -w -r '"github.com/marcboeker/go-duckdb/mapping" -> "github.com/duckdb/duckdb-go/mapping"' .
 gofmt -w -r '"github.com/marcboeker/go-duckdb/arrowmapping" -> "github.com/duckdb/duckdb-go/arrowmapping"' .
 
@@ -62,6 +62,8 @@ However, the motivation behind this fork, which is a joint effort of Marc Boeker
 is to fully transfer the maintenance and day-to-day work of the driver to the DuckDB team.
 That being said, the DuckDB Go client has become what it is also due to its many contributions from the community,
 and we are looking forward to your future PRs, issues, and discussions!
+
+The license is unchanged: the migrated repository keeps the original MIT license, which is the same for core DuckDB and other primary clients.
 
 ## Breaking Changes
 
