@@ -496,6 +496,20 @@ func (s *Stmt) GetColumnTypes() ([]Type, error) {
 	return types, nil
 }
 
+func (s *Stmt) GetColumnLogicalTypes() ([]mapping.LogicalType, error) {
+	n, err := s.ColumnCount()
+	if err != nil {
+		return nil, err
+	}
+
+	types := make([]mapping.LogicalType, n)
+	for i := range n {
+		t := mapping.PreparedStatementColumnLogicalType(*s.preparedStmt, mapping.IdxT(i))
+		types[i] = t
+	}
+	return types, nil
+}
+
 func (s *Stmt) GetColumnNames() ([]string, error) {
 	if s.closed {
 		return nil, errClosedStmt
