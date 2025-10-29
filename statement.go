@@ -548,6 +548,23 @@ func (s *Stmt) GetParameterTypes() ([]Type, error) {
 	return types, nil
 }
 
+func (s *Stmt) GetParameterLogicalTypes() ([]mapping.LogicalType, error) {
+	if s.closed {
+		return nil, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return nil, errUninitializedStmt
+	}
+
+	count := mapping.NParams(*s.preparedStmt)
+	types := make([]mapping.LogicalType, count)
+	for i := mapping.IdxT(0); i < count; i++ {
+		t := mapping.ParamLogicalType(*s.preparedStmt, i+1)
+		types[i] = t
+	}
+	return types, nil
+}
+
 func (s *Stmt) NParams() (int, error) {
 	if s.closed {
 		return 0, errClosedStmt
