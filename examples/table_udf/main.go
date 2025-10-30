@@ -93,7 +93,7 @@ func main() {
 	check(db.Close())
 }
 
-func check(err interface{}) {
+func check(err any) {
 	if err != nil {
 		panic(err)
 	}
