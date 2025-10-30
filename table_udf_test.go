@@ -922,7 +922,7 @@ func BenchmarkRowTableUDF(b *testing.B) {
 	require.NoError(b, err)
 
 	b.StartTimer()
-	for range b.N {
+	for b.Loop() {
 		res, errQuery := db.QueryContext(context.Background(), "SELECT * FROM whoo(2048*64)")
 		require.NoError(b, errQuery)
 		closeRowsWrapper(b, res)
@@ -942,7 +942,7 @@ func BenchmarkChunkTableUDF(b *testing.B) {
 	require.NoError(b, err)
 
 	b.StartTimer()
-	for range b.N {
+	for b.Loop() {
 		res, errQuery := db.QueryContext(context.Background(), "SELECT * FROM whoo(2048*64)")
 		require.NoError(b, errQuery)
 		closeRowsWrapper(b, res)

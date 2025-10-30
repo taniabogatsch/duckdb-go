@@ -1071,7 +1071,7 @@ func BenchmarkAppenderNested(b *testing.B) {
 	rowsToAppend := prepareNestedData(rowCount)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		appendNestedData(b, a, rowsToAppend)
 	}
 	b.StopTimer()
