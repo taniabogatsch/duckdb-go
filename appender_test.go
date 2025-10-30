@@ -873,10 +873,10 @@ func TestAppenderWithJSON(t *testing.T) {
 	i := 0
 	for res.Next() {
 		var (
-			c1 interface{}
-			l1 interface{}
-			s1 interface{}
-			l2 interface{}
+			c1 any
+			l1 any
+			s1 any
+			l2 any
 		)
 		err := res.Scan(&c1, &l1, &s1, &l2)
 		require.NoError(t, err)
