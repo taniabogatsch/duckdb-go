@@ -44,13 +44,13 @@ func newRowsWithStmt(res mapping.Result, stmt *Stmt) *rows {
 		dbTypeNames: make([]string, columnCount),
 	}
 
-	for i := mapping.IdxT(0); i < columnCount; i++ {
-		columnName := mapping.ColumnName(&res, i)
+	for i := range uint64(columnCount) {
+		columnName := mapping.ColumnName(&res, mapping.IdxT(i))
 		r.chunk.columnNames = append(r.chunk.columnNames, columnName)
 
 		// Cache column metadata
-		logicalType := mapping.ColumnLogicalType(&res, i)
-		r.scanTypes[i] = r.getScanType(logicalType, i)
+		logicalType := mapping.ColumnLogicalType(&res, mapping.IdxT(i))
+		r.scanTypes[i] = r.getScanType(logicalType, mapping.IdxT(i))
 		r.dbTypeNames[i] = logicalTypeString(logicalType)
 		mapping.DestroyLogicalType(&logicalType)
 	}
@@ -240,13 +240,13 @@ func logicalTypeNameStruct(logicalType mapping.LogicalType) string {
 
 	count := mapping.StructTypeChildCount(logicalType)
 
-	for i := mapping.IdxT(0); i < count; i++ {
+	for i := range uint64(count) {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 
-		childName := mapping.StructTypeChildName(logicalType, i)
-		childType := mapping.StructTypeChildType(logicalType, i)
+		childName := mapping.StructTypeChildName(logicalType, mapping.IdxT(i))
+		childType := mapping.StructTypeChildType(logicalType, mapping.IdxT(i))
 
 		sb.WriteString(escapeStructFieldName(childName))
 		sb.WriteByte(' ')
