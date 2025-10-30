@@ -20,10 +20,6 @@ type rows struct {
 	chunk DataChunk
 	// closeChunk is true after the first iteration of Next.
 	closeChunk bool
-	// chunkCount is the number of chunks in the result.
-	chunkCount mapping.IdxT
-	// chunkIdx is the chunk index in the result.
-	chunkIdx mapping.IdxT
 	// rowCount is the number of scanned rows.
 	rowCount int
 	// cached column metadata to avoid repeated CGO calls
@@ -37,8 +33,6 @@ func newRowsWithStmt(res mapping.Result, stmt *Stmt) *rows {
 		res:         res,
 		stmt:        stmt,
 		chunk:       DataChunk{},
-		chunkCount:  mapping.ResultChunkCount(res),
-		chunkIdx:    0,
 		rowCount:    0,
 		scanTypes:   make([]reflect.Type, columnCount),
 		dbTypeNames: make([]string, columnCount),
@@ -68,16 +62,14 @@ func (r *rows) Next(dst []driver.Value) error {
 			r.chunk.close()
 			r.closeChunk = false
 		}
-		if r.chunkIdx == r.chunkCount {
+		chunk := mapping.FetchChunk(r.res)
+		if chunk.Ptr == nil {
 			return io.EOF
 		}
-		chunk := mapping.ResultGetChunk(r.res, r.chunkIdx)
 		r.closeChunk = true
 		if err := r.chunk.initFromDuckDataChunk(chunk, false); err != nil {
 			return getError(err, nil)
 		}
-
-		r.chunkIdx++
 		r.rowCount = 0
 	}
 
