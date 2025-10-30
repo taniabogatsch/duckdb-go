@@ -17,6 +17,8 @@ type Appender struct {
 	appender mapping.Appender
 	// True, if the appender has been closed.
 	closed bool
+	// True, if the appender has been invalidated.
+	invalidated bool
 
 	// The chunk to append to.
 	chunk DataChunk
@@ -125,10 +127,15 @@ func NewQueryAppender(driverConn driver.Conn, query, table string, colTypes []Ty
 // Does not close the appender, even if it returns an error. Unless you have a good reason to call this,
 // call Close when you are done with the appender.
 func (a *Appender) Flush() error {
+	if a.invalidated {
+		return getError(errAppenderInvalidated, nil)
+	}
 	if err := a.appendDataChunk(); err != nil {
+		a.invalidated = true
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 	if err := a.flush(); err != nil {
+		a.invalidated = true
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 
@@ -140,11 +147,16 @@ func (a *Appender) Flush() error {
 // call CloseWithCancel when you are done with the appender.
 // Takes a context for cancellation.
 func (a *Appender) FlushWithCancel(ctx context.Context) error {
+	if a.invalidated {
+		return getError(errAppenderInvalidated, nil)
+	}
 	if err := a.appendDataChunk(); err != nil {
+		a.invalidated = true
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 
 	if err := a.flushWithCancel(ctx); err != nil {
+		a.invalidated = true
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 
@@ -153,6 +165,7 @@ func (a *Appender) FlushWithCancel(ctx context.Context) error {
 
 // Close the appender. This will flush the appender to the underlying table.
 // It is vital to call this when you are done with the appender to avoid leaking memory.
+// You also must call this when the appender has been invalidated.
 func (a *Appender) Close() error {
 	return a.close(nil, func(ctx *context.Context) error {
 		return a.flush()

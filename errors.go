@@ -119,6 +119,7 @@ var (
 	errAppenderEmptyQuery       = errors.New("empty query")
 	errAppenderEmptyColumnTypes = errors.New("empty column types")
 	errAppenderColumnMismatch   = errors.New("mismatch between the number of column types and names")
+	errAppenderInvalidated      = errors.New("the appender has been invalidated and must be closed")
 
 	errUnsupportedMapKeyType = errors.New("MAP key type not supported")
 	errEmptyName             = errors.New("empty name")

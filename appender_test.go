@@ -1094,43 +1094,42 @@ func TestAppenderInterrupt(t *testing.T) {
 			require.NoError(t, a.AppendRow(0))
 
 			if i == 0 {
+				fmt.Println("going into 0")
 				// Long-running flush.
 				ctx, cancel := context.WithCancel(context.Background())
 				go func() {
 					err = a.FlushWithCancel(ctx)
 					require.ErrorContains(t, err, "Interrupted!")
+					fmt.Println("long running flush")
 				}()
 
 				// Interrupt it.
 				time.Sleep(1 * time.Millisecond)
-				go func() {
-					cancel()
-				}()
+				cancel()
 
 				// Also use interrupt for closing it (also runs long, same query).
 				go func() {
 					err = a.CloseWithCancel(ctx)
 					require.ErrorContains(t, err, "Interrupted!")
+					fmt.Println("long-running close after flush")
 				}()
 
 				// Interrupt it.
 				time.Sleep(1 * time.Millisecond)
-				go func() {
-					cancel()
-				}()
+				cancel()
 			} else {
+				fmt.Println("going into 1")
 				// Long-running close.
 				ctx, cancel := context.WithCancel(context.Background())
 				go func() {
 					err = a.CloseWithCancel(ctx)
 					require.ErrorContains(t, err, "Interrupted!")
+					fmt.Println("long running close")
 				}()
 
 				// Interrupt it.
 				time.Sleep(1 * time.Millisecond)
-				go func() {
-					cancel()
-				}()
+				cancel()
 			}
 		}()
 	}

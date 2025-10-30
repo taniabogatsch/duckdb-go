@@ -1018,14 +1018,20 @@ func TestInterrupt(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Long-running query.
+	errs := make(chan error, 0)
 	go func() {
 		_, err := db.ExecContext(ctx, "CREATE TABLE t AS SELECT range::VARCHAR, random() AS k FROM range(1_000_000_000) ORDER BY k")
-		require.ErrorContains(t, err, "INTERRUPT Error: Interrupted!")
+		errs <- err
 	}()
 
 	// Interrupt it.
 	time.Sleep(1 * time.Millisecond)
-	go func() {
-		cancel()
-	}()
+	cancel()
+	time.Sleep(1 * time.Millisecond)
+
+	select {
+	case err := <-errs:
+		require.ErrorContains(t, err, ctx.Err().Error())
+		require.ErrorContains(t, err, "Interrupted!")
+	}
 }
