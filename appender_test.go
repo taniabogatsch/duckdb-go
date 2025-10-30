@@ -799,7 +799,7 @@ func TestAppendToCatalog(t *testing.T) {
 	conn := openConnWrapper(t, db, context.Background())
 	defer closeConnWrapper(t, conn)
 
-	err = conn.Raw(func(anyConn interface{}) error {
+	err = conn.Raw(func(anyConn any) error {
 		driverConn := anyConn.(driver.Conn)
 		a, innerErr := NewAppender(driverConn, "other", "", "test")
 		require.NoError(t, innerErr)
@@ -857,7 +857,7 @@ func TestAppenderWithJSON(t *testing.T) {
 	defer cleanupAppender(t, c, db, conn, a)
 
 	for _, jsonInput := range jsonInputs {
-		var jsonData map[string]interface{}
+		var jsonData map[string]any
 		err := json.Unmarshal(jsonInput, &jsonData)
 		require.NoError(t, err)
 		require.NoError(t, a.AppendRow(jsonData["c1"], jsonData["l1"], jsonData["s1"], jsonData["l2"]))
