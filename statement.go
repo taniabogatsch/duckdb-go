@@ -471,7 +471,7 @@ func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driv
 }
 
 // ColumnCount returns the number of columns that will be returned by executing the prepared statement.
-// If any of the column types is invalid, the result will be 1.
+// If any of the column types is invalid (which can happen when the type is ambiguous), the result will be 1.
 // Returns an error if the statement is closed or uninitialized.
 func (s *Stmt) ColumnCount() (int, error) {
 	if s.closed {
