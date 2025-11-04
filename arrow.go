@@ -174,8 +174,7 @@ func recordReaderFromRows(ctx context.Context, from driver.Rows) (array.RecordRe
 		return nil, fmt.Errorf("cannot convert duckdb rows to arrow reader after reading has started")
 	}
 	// arrow options
-	arrowOptions := arrowmapping.ArrowOptions{}
-	arrowmapping.ConnectionGetArrowOptions(rr.stmt.conn.conn, &arrowOptions)
+	arrowOptions := arrowmapping.ResultGetArrowOptions(&rr.res)
 	// get arrow schema
 	cc := mapping.ColumnCount(&rr.res)
 	names := make([]string, cc)
