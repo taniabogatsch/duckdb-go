@@ -470,6 +470,9 @@ func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driv
 	return &result{ra}, nil
 }
 
+// ColumnCount returns the number of columns that will be returned by executing the prepared statement.
+// If any of the column types is invalid, the result will be 1.
+// Returns an error if the statement is closed or uninitialized.
 func (s *Stmt) ColumnCount() (int, error) {
 	if s.closed {
 		return 0, errClosedStmt
@@ -482,7 +485,9 @@ func (s *Stmt) ColumnCount() (int, error) {
 	return int(count), nil
 }
 
-func (s *Stmt) GetColumnTypes() ([]Type, error) {
+// ColumnTypes returns the types of all columns in the result set of the prepared statement.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnTypes() ([]Type, error) {
 	n, err := s.ColumnCount()
 	if err != nil {
 		return nil, err
@@ -496,7 +501,13 @@ func (s *Stmt) GetColumnTypes() ([]Type, error) {
 	return types, nil
 }
 
-func (s *Stmt) GetColumnLogicalTypes() ([]mapping.LogicalType, error) {
+// ColumnLogicalTypes returns the logical types of all columns in the result set of the prepared statement.
+// Logical types provide more detailed type information than the basic Type, including custom types,
+// nested structures, and type modifiers. The returned slice has one LogicalType entry for each column.
+// Note: The caller is responsible for calling mapping.DestroyLogicalType on each returned LogicalType
+// during cleanup.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnLogicalTypes() ([]mapping.LogicalType, error) {
 	n, err := s.ColumnCount()
 	if err != nil {
 		return nil, err
@@ -510,7 +521,11 @@ func (s *Stmt) GetColumnLogicalTypes() ([]mapping.LogicalType, error) {
 	return types, nil
 }
 
-func (s *Stmt) GetColumnNames() ([]string, error) {
+// ColumnNames returns the names of all columns in the result set of the prepared statement.
+// The returned slice has one string entry for each column, indexed starting from 0.
+// For statements that do not return a result set, this returns an empty slice.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnNames() ([]string, error) {
 	if s.closed {
 		return nil, errClosedStmt
 	}
@@ -529,52 +544,6 @@ func (s *Stmt) GetColumnNames() ([]string, error) {
 		names[i] = name
 	}
 	return names, nil
-}
-
-func (s *Stmt) GetParameterTypes() ([]Type, error) {
-	if s.closed {
-		return nil, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return nil, errUninitializedStmt
-	}
-
-	count := mapping.NParams(*s.preparedStmt)
-	types := make([]Type, count)
-	for i := mapping.IdxT(0); i < count; i++ {
-		t := mapping.ParamType(*s.preparedStmt, i+1)
-		types[i] = t
-	}
-	return types, nil
-}
-
-func (s *Stmt) GetParameterLogicalTypes() ([]mapping.LogicalType, error) {
-	if s.closed {
-		return nil, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return nil, errUninitializedStmt
-	}
-
-	count := mapping.NParams(*s.preparedStmt)
-	types := make([]mapping.LogicalType, count)
-	for i := mapping.IdxT(0); i < count; i++ {
-		t := mapping.ParamLogicalType(*s.preparedStmt, i+1)
-		types[i] = t
-	}
-	return types, nil
-}
-
-func (s *Stmt) NParams() (int, error) {
-	if s.closed {
-		return 0, errClosedStmt
-	}
-	if s.preparedStmt == nil {
-		return 0, errUninitializedStmt
-	}
-
-	count := mapping.NParams(*s.preparedStmt)
-	return int(count), nil
 }
 
 // ExecBound executes a bound query that doesn't return rows, such as an INSERT or UPDATE.
