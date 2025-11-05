@@ -189,9 +189,11 @@ func recordReaderFromRows(ctx context.Context, from driver.Rows) (array.RecordRe
 		}
 	}()
 
-	schema, err := arrowmapping.NewArrowSchema(&arrowOptions, types, names)
-	if err != nil {
-		return nil, err
+	schema, ed := arrowmapping.NewArrowSchema(arrowOptions, types, names)
+	defer mapping.DestroyErrorData(&ed)
+	if mapping.ErrorDataHasError(ed) {
+		return nil, fmt.Errorf("failed to create arrow schema: %w",
+			getDuckDBError(mapping.ErrorDataMessage(ed)))
 	}
 
 	return &duckdbArrowReader{
@@ -268,9 +270,10 @@ func (r *duckdbArrowReader) Next() bool {
 			return false
 		}
 		defer mapping.DestroyDataChunk(&chunk)
-		rec, err := arrowmapping.DataChunkToArrowArray(r.opts, r.schema, &chunk)
-		if err != nil {
-			r.err = err
+		rec, ed := arrowmapping.DataChunkToArrowArray(*r.opts, r.schema, chunk)
+		defer mapping.DestroyErrorData(&ed)
+		if mapping.ErrorDataHasError(ed) {
+			r.err = fmt.Errorf("failed to create arrow array: %w", getDuckDBError(mapping.ErrorDataMessage(ed)))
 			return false
 		}
 		r.current = rec
