@@ -502,7 +502,8 @@ func (s *Stmt) ColumnType(idx int) (Type, error) {
 
 // ColumnTypeInfo returns the TypeInfo of the column at the given index (0-based).
 // TypeInfo provides detailed type information including nested structures, DECIMAL precision,
-// ENUM values, etc. For out-of-range indices, returns an error indicating TYPE_INVALID.
+// ENUM values, etc.
+// Returns a TypeInfo with internalType TYPE_INVALID if the column is out of range.
 // Returns an error if the statement is closed or uninitialized.
 func (s *Stmt) ColumnTypeInfo(idx int) (TypeInfo, error) {
 	if s.closed {
@@ -519,7 +520,7 @@ func (s *Stmt) ColumnTypeInfo(idx int) (TypeInfo, error) {
 }
 
 // ColumnName returns the name of the column at the given index (0-based).
-// Returns an empty string if the column is out of range.
+// Returns "" if the column is out of range.
 // Returns an error if the statement is closed or uninitialized.
 func (s *Stmt) ColumnName(idx int) (string, error) {
 	if s.closed {

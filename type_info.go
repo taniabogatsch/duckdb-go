@@ -502,7 +502,7 @@ func NewTypeInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	case TYPE_UNION:
 		return newUnionInfoFromLogicalType(lt)
 	case TYPE_INVALID:
-		return nil, getError(errAPI, errors.New("cannot create TypeInfo from TYPE_INVALID"))
+		return &typeInfo{baseTypeInfo: baseTypeInfo{Type: TYPE_INVALID}}, nil
 	default:
 		// Simple/primitive type
 		return NewTypeInfo(t)

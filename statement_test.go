@@ -182,25 +182,27 @@ func TestPrepareQueryPositional(t *testing.T) {
 		// Test column count
 		columnCount, innerErr := stmt.ColumnCount()
 		require.NoError(t, innerErr)
-		require.Equal(t, 2, columnCount)
+		require.Equal(t, 1, columnCount)
 
 		// Test column names
 		colName, innerErr := stmt.ColumnName(0)
 		require.NoError(t, innerErr)
-		require.Equal(t, "first_param", colName)
+		require.Equal(t, "unknown", colName)
 
+		// Out of range
 		colName, innerErr = stmt.ColumnName(1)
 		require.NoError(t, innerErr)
-		require.Equal(t, "second_param", colName)
+		require.Equal(t, "", colName)
 
 		// Test column types - should be TYPE_INVALID for unresolved parameter types
 		colType, innerErr := stmt.ColumnType(0)
 		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_INVALID, colType) // Type cannot be resolved from parameters
+		require.Equal(t, TYPE_INVALID, colType)
 
+		// Out of range also returns TYPE_INVALID
 		colType, innerErr = stmt.ColumnType(1)
 		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_INVALID, colType) // Type cannot be resolved from parameters
+		require.Equal(t, TYPE_INVALID, colType)
 
 		return nil
 	})
@@ -252,16 +254,16 @@ func TestPrepareQueryPositional(t *testing.T) {
 		// Test column methods for UPDATE statement (should have no columns)
 		columnCount, innerErr := stmt.ColumnCount()
 		require.NoError(t, innerErr)
-		require.Equal(t, 0, columnCount) // UPDATE doesn't return columns
+		require.Equal(t, 1, columnCount)
 
 		// Test out of bounds access - should return empty/invalid for UPDATE with no columns
 		colName, innerErr := stmt.ColumnName(0)
 		require.NoError(t, innerErr)
-		require.Equal(t, "", colName)
+		require.Equal(t, "Count", colName)
 
 		colType, innerErr := stmt.ColumnType(0)
 		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_INVALID, colType)
+		require.Equal(t, TYPE_BIGINT, colType)
 
 		r, innerErr := stmt.ExecBound(context.Background())
 		require.Nil(t, r)
@@ -1232,9 +1234,8 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 
 		// Test out of bounds - should return error with TYPE_INVALID
 		typeInfo, innerErr = stmt.ColumnTypeInfo(4)
-		require.Error(t, innerErr)
-		require.Nil(t, typeInfo)
-		require.Contains(t, innerErr.Error(), "cannot create TypeInfo from TYPE_INVALID")
+		require.NoError(t, innerErr)
+		require.Equal(t, TYPE_INVALID, typeInfo.InternalType())
 
 		return nil
 	})

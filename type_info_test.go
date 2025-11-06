@@ -644,7 +644,7 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, []string{"red", "green", "blue"}, enumDetails.Values)
 
-		// Test that modifying the returned slice doesn't affect the original
+		// Test that modifying the returned slice doesn't affect the original TypeInfo
 		enumDetails.Values[0] = "modified"
 		details2 := info.Details()
 		enumDetails2, ok := details2.(*EnumDetails)
@@ -754,6 +754,15 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, TYPE_INTEGER, unionDetails.Members[0].Type.InternalType())
 		require.Equal(t, "text", unionDetails.Members[1].Name)
 		require.Equal(t, TYPE_VARCHAR, unionDetails.Members[1].Type.InternalType())
+
+		// Test that modifying the returned details doesn't affect the original TypeInfo
+		unionDetails.Members[0].Name = "new_name"
+
+		details2 := info.Details()
+		require.NotNil(t, details2)
+		unionDetails2, ok := details2.(*UnionDetails)
+		require.True(t, ok)
+		require.Equal(t, "num", unionDetails2.Members[0].Name)
 	})
 
 	// Test nested type details
