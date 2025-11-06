@@ -75,9 +75,10 @@ func TestPrepareQuery(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, "baz", colName)
 
-		// Test out of bounds - should return empty string
+		// Test out of bounds - should return error
 		colName, innerErr = stmt.ColumnName(2)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, "", colName)
 
 		// Test column types
@@ -89,9 +90,10 @@ func TestPrepareQuery(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INTEGER, colType)
 
-		// Test out of bounds - should return TYPE_INVALID
+		// Test out of bounds - should return error
 		colType, innerErr = stmt.ColumnType(2)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
 		r, innerErr := stmt.QueryBound(context.Background())
@@ -189,9 +191,10 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, "unknown", colName)
 
-		// Out of range
+		// Out of range - should return error
 		colName, innerErr = stmt.ColumnName(1)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, "", colName)
 
 		// Test column types - should be TYPE_INVALID for unresolved parameter types
@@ -199,9 +202,10 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INVALID, colType)
 
-		// Out of range also returns TYPE_INVALID
+		// Out of range - should return error
 		colType, innerErr = stmt.ColumnType(1)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
 		return nil
@@ -1176,13 +1180,15 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, "created_at", name)
 
-		// Test out of bounds - should return empty string
+		// Test out of bounds - should return error
 		name, innerErr = stmt.ColumnName(-1)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, "", name)
 
 		name, innerErr = stmt.ColumnName(4)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, "", name)
 
 		// Test ColumnType
@@ -1202,13 +1208,15 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_TIMESTAMP, colType)
 
-		// Test out of bounds - should return TYPE_INVALID
+		// Test out of bounds - should return error
 		colType, innerErr = stmt.ColumnType(-1)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
 		colType, innerErr = stmt.ColumnType(4)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
 		// Test ColumnTypeInfo - should return TypeInfo for each column
@@ -1232,10 +1240,16 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		require.NotNil(t, typeInfo)
 		require.Equal(t, TYPE_TIMESTAMP, typeInfo.InternalType())
 
-		// Test out of bounds - should return error with TYPE_INVALID
+		// Test out of bounds - should return error
 		typeInfo, innerErr = stmt.ColumnTypeInfo(4)
-		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_INVALID, typeInfo.InternalType())
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
+		require.Nil(t, typeInfo)
+
+		typeInfo, innerErr = stmt.ColumnTypeInfo(-1)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
+		require.Nil(t, typeInfo)
 
 		return nil
 	})
@@ -1488,9 +1502,10 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INVALID, colType)
 
-		// Out of bounds access
+		// Out of bounds access - should return error
 		colType, innerErr = stmt.ColumnType(1)
-		require.NoError(t, innerErr)
+		require.Error(t, innerErr)
+		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
 		return nil
