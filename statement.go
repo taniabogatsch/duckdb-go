@@ -485,47 +485,26 @@ func (s *Stmt) ColumnCount() (int, error) {
 	return int(count), nil
 }
 
-// ColumnTypes returns the types of all columns in the result set of the prepared statement.
+// ColumnType returns the type of the column at the given index (0-based).
+// Returns TYPE_INVALID if the column is out of range.
 // Returns an error if the statement is closed or uninitialized.
-func (s *Stmt) ColumnTypes() ([]Type, error) {
-	n, err := s.ColumnCount()
-	if err != nil {
-		return nil, err
+func (s *Stmt) ColumnType(idx int) (Type, error) {
+	if s.closed {
+		return TYPE_INVALID, errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return TYPE_INVALID, errUninitializedStmt
 	}
 
-	types := make([]Type, n)
-	for i := range n {
-		t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(i))
-		types[i] = t
-	}
-	return types, nil
+	t := mapping.PreparedStatementColumnType(*s.preparedStmt, mapping.IdxT(idx))
+	return t, nil
 }
 
-// ColumnLogicalTypes returns the logical types of all columns in the result set of the prepared statement.
-// Logical types provide more detailed type information than the basic Type, including custom types,
-// nested structures, and type modifiers. The returned slice has one LogicalType entry for each column.
-// Note: The caller is responsible for calling mapping.DestroyLogicalType on each returned LogicalType
-// during cleanup.
+// ColumnTypeInfo returns the TypeInfo of the column at the given index (0-based).
+// TypeInfo provides detailed type information including nested structures, DECIMAL precision,
+// ENUM values, etc. For out-of-range indices, returns an error indicating TYPE_INVALID.
 // Returns an error if the statement is closed or uninitialized.
-func (s *Stmt) ColumnLogicalTypes() ([]mapping.LogicalType, error) {
-	n, err := s.ColumnCount()
-	if err != nil {
-		return nil, err
-	}
-
-	types := make([]mapping.LogicalType, n)
-	for i := range n {
-		t := mapping.PreparedStatementColumnLogicalType(*s.preparedStmt, mapping.IdxT(i))
-		types[i] = t
-	}
-	return types, nil
-}
-
-// ColumnNames returns the names of all columns in the result set of the prepared statement.
-// The returned slice has one string entry for each column, indexed starting from 0.
-// For statements that do not return a result set, this returns an empty slice.
-// Returns an error if the statement is closed or uninitialized.
-func (s *Stmt) ColumnNames() ([]string, error) {
+func (s *Stmt) ColumnTypeInfo(idx int) (TypeInfo, error) {
 	if s.closed {
 		return nil, errClosedStmt
 	}
@@ -533,17 +512,29 @@ func (s *Stmt) ColumnNames() ([]string, error) {
 		return nil, errUninitializedStmt
 	}
 
-	n, err := s.ColumnCount()
-	if err != nil {
-		return nil, err
+	lt := mapping.PreparedStatementColumnLogicalType(*s.preparedStmt, mapping.IdxT(idx))
+	defer mapping.DestroyLogicalType(&lt)
+
+	return NewTypeInfoFromLogicalType(lt)
+}
+
+// ColumnName returns the name of the column at the given index (0-based).
+// Returns an empty string if the column is out of range.
+// Returns an error if the statement is closed or uninitialized.
+func (s *Stmt) ColumnName(idx int) (string, error) {
+	if s.closed {
+		return "", errClosedStmt
+	}
+	if s.preparedStmt == nil {
+		return "", errUninitializedStmt
 	}
 
-	names := make([]string, n)
-	for i := range n {
-		name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(i))
-		names[i] = name
+	name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(idx))
+	// C API returns nullptr for out-of-range indices
+	if name == "" {
+		return "", nil
 	}
-	return names, nil
+	return name, nil
 }
 
 // ExecBound executes a bound query that doesn't return rows, such as an INSERT or UPDATE.
