@@ -797,6 +797,6 @@ func TestTypeInfoDetails(t *testing.T) {
 
 		structDetailsTyped, ok := structDetails.(*StructDetails)
 		require.True(t, ok)
-		require.Len(t, len(structDetailsTyped.Entries), 2)
+		require.Len(t, structDetailsTyped.Entries, 2)
 	})
 }
