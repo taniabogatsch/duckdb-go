@@ -3,8 +3,9 @@ package duckdb
 import (
 	"testing"
 
-	"github.com/duckdb/duckdb-go/mapping"
 	"github.com/stretchr/testify/require"
+
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 type testTypeValues struct {
@@ -594,14 +595,12 @@ func TestNewTypeInfoFromLogicalType(t *testing.T) {
 
 		structDetails, ok := listDetails.Child.Details().(*StructDetails)
 		require.True(t, ok)
-		require.Equal(t, 2, len(structDetails.Entries))
+		require.Len(t, structDetails.Entries, 2)
 		require.Equal(t, TYPE_INTEGER, structDetails.Entries[0].Info().InternalType())
 		require.Equal(t, "id", structDetails.Entries[0].Name())
 		require.Equal(t, TYPE_VARCHAR, structDetails.Entries[1].Info().InternalType())
 		require.Equal(t, "name", structDetails.Entries[1].Name())
-
 	})
-
 }
 
 func TestTypeInfoDetails(t *testing.T) {
@@ -724,7 +723,7 @@ func TestTypeInfoDetails(t *testing.T) {
 
 		structDetails, ok := details.(*StructDetails)
 		require.True(t, ok)
-		require.Equal(t, 2, len(structDetails.Entries))
+		require.Len(t, structDetails.Entries, 2)
 		require.Equal(t, "id", structDetails.Entries[0].Name())
 		require.Equal(t, TYPE_INTEGER, structDetails.Entries[0].Info().InternalType())
 		require.Equal(t, "name", structDetails.Entries[1].Name())
@@ -749,7 +748,7 @@ func TestTypeInfoDetails(t *testing.T) {
 
 		unionDetails, ok := details.(*UnionDetails)
 		require.True(t, ok)
-		require.Equal(t, 2, len(unionDetails.Members))
+		require.Len(t, unionDetails.Members, 2)
 		require.Equal(t, "num", unionDetails.Members[0].Name)
 		require.Equal(t, TYPE_INTEGER, unionDetails.Members[0].Type.InternalType())
 		require.Equal(t, "text", unionDetails.Members[1].Name)
@@ -798,6 +797,6 @@ func TestTypeInfoDetails(t *testing.T) {
 
 		structDetailsTyped, ok := structDetails.(*StructDetails)
 		require.True(t, ok)
-		require.Equal(t, 2, len(structDetailsTyped.Entries))
+		require.Len(t, len(structDetailsTyped.Entries), 2)
 	})
 }

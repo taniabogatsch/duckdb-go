@@ -79,7 +79,7 @@ func TestPrepareQuery(t *testing.T) {
 		colName, innerErr = stmt.ColumnName(2)
 		require.Error(t, innerErr)
 		require.ErrorIs(t, innerErr, errAPI)
-		require.Equal(t, "", colName)
+		require.Empty(t, colName)
 
 		// Test column types
 		colType, innerErr := stmt.ColumnType(0)
@@ -179,7 +179,6 @@ func TestPrepareQueryPositional(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT $1 AS first_param, $2 AS second_param`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// Test column count
 		columnCount, innerErr := stmt.ColumnCount()
@@ -195,7 +194,7 @@ func TestPrepareQueryPositional(t *testing.T) {
 		colName, innerErr = stmt.ColumnName(1)
 		require.Error(t, innerErr)
 		require.ErrorIs(t, innerErr, errAPI)
-		require.Equal(t, "", colName)
+		require.Empty(t, colName)
 
 		// Test column types - should be TYPE_INVALID for unresolved parameter types
 		colType, innerErr := stmt.ColumnType(0)
@@ -208,6 +207,7 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1156,7 +1156,6 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT id, name, value, created_at FROM test_columns`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// Test ColumnCount
 		count, innerErr := stmt.ColumnCount()
@@ -1184,12 +1183,12 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		name, innerErr = stmt.ColumnName(-1)
 		require.Error(t, innerErr)
 		require.ErrorIs(t, innerErr, errAPI)
-		require.Equal(t, "", name)
+		require.Empty(t, name)
 
 		name, innerErr = stmt.ColumnName(4)
 		require.Error(t, innerErr)
 		require.ErrorIs(t, innerErr, errAPI)
-		require.Equal(t, "", name)
+		require.Empty(t, name)
 
 		// Test ColumnType
 		colType, innerErr := stmt.ColumnType(0)
@@ -1251,6 +1250,7 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		require.ErrorIs(t, innerErr, errAPI)
 		require.Nil(t, typeInfo)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1301,7 +1301,6 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 			        {'x': 10, 'y': 20} AS struct_col`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// Test ARRAY column
 		typeInfo, innerErr := stmt.ColumnTypeInfo(0)
@@ -1341,7 +1340,7 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		require.NotNil(t, details)
 		structDetails, ok := details.(*StructDetails)
 		require.True(t, ok, "Expected StructDetails")
-		require.Equal(t, 2, len(structDetails.Entries))
+		require.Len(t, structDetails.Entries, 2)
 
 		// Check first field 'x'
 		require.Equal(t, "x", structDetails.Entries[0].Name())
@@ -1351,6 +1350,7 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		require.Equal(t, "y", structDetails.Entries[1].Name())
 		require.Equal(t, TYPE_INTEGER, structDetails.Entries[1].Info().InternalType())
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1362,7 +1362,6 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT 123.45::DECIMAL(10,2) AS dec_col`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		typeInfo, innerErr := stmt.ColumnTypeInfo(0)
 		require.NoError(t, innerErr)
@@ -1377,6 +1376,7 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		require.Equal(t, uint8(10), decimalDetails.Width)
 		require.Equal(t, uint8(2), decimalDetails.Scale)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1394,7 +1394,6 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 			`SELECT 'happy'::mood AS mood_col`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		typeInfo, innerErr := stmt.ColumnTypeInfo(0)
 		require.NoError(t, innerErr)
@@ -1408,6 +1407,7 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		require.True(t, ok, "Expected EnumDetails")
 		require.Equal(t, []string{"happy", "sad", "neutral"}, enumDetails.Values)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1420,7 +1420,6 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 			`SELECT MAP([1, 2], ['a', 'b']) AS map_col`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		typeInfo, innerErr := stmt.ColumnTypeInfo(0)
 		require.NoError(t, innerErr)
@@ -1435,6 +1434,7 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		require.Equal(t, TYPE_INTEGER, mapDetails.Key.InternalType())
 		require.Equal(t, TYPE_VARCHAR, mapDetails.Value.InternalType())
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1447,7 +1447,6 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 			`SELECT [{'id': 1, 'name': 'Alice'}, {'id': 2, 'name': 'Bob'}] AS list_struct_col`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		typeInfo, innerErr := stmt.ColumnTypeInfo(0)
 		require.NoError(t, innerErr)
@@ -1464,12 +1463,13 @@ func TestPreparedStatementColumnTypeInfo(t *testing.T) {
 		// Assert nested STRUCT details
 		structDetails, ok := listDetails.Child.Details().(*StructDetails)
 		require.True(t, ok, "Expected StructDetails for nested type")
-		require.Equal(t, 2, len(structDetails.Entries))
+		require.Len(t, structDetails.Entries, 2)
 		require.Equal(t, "id", structDetails.Entries[0].Name())
 		require.Equal(t, TYPE_INTEGER, structDetails.Entries[0].Info().InternalType())
 		require.Equal(t, "name", structDetails.Entries[1].Name())
 		require.Equal(t, TYPE_VARCHAR, structDetails.Entries[1].Info().InternalType())
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1490,7 +1490,6 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT * FROM (VALUES (?, ?)) t(a, b)`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// When columns have ambiguous types, count becomes 1
 		count, innerErr := stmt.ColumnCount()
@@ -1508,6 +1507,7 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		require.ErrorIs(t, innerErr, errAPI)
 		require.Equal(t, TYPE_INVALID, colType)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1519,7 +1519,6 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT ?, ?, ? + ?`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// When columns have ambiguous types, count becomes 1
 		count, innerErr := stmt.ColumnCount()
@@ -1531,6 +1530,7 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INVALID, colType)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1544,7 +1544,6 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT id, value, ? AS param_col FROM test_mixed`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// When any column has ambiguous type, count becomes 1
 		count, innerErr := stmt.ColumnCount()
@@ -1556,6 +1555,7 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INVALID, colType)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)
@@ -1567,7 +1567,6 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT id, value FROM test_mixed`)
 		require.NoError(t, innerErr)
 		stmt := s.(*Stmt)
-		defer stmt.Close()
 
 		// Normal count when no ambiguous types
 		count, innerErr := stmt.ColumnCount()
@@ -1583,6 +1582,7 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_VARCHAR, colType)
 
+		require.NoError(t, stmt.Close())
 		return nil
 	})
 	require.NoError(t, err)

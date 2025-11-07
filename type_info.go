@@ -520,7 +520,7 @@ func newEnumInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	}
 
 	values := make([]string, size)
-	for i := uint32(0); i < size; i++ {
+	for i := range size {
 		values[i] = mapping.EnumDictionaryValue(lt, mapping.IdxT(i))
 	}
 
