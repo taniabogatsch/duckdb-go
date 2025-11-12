@@ -70,6 +70,9 @@ func replacement_scan_callback(infoPtr, tableNamePtr, data unsafe.Pointer) {
 			}
 			val := mapping.CreateListValue(mapping.CreateLogicalType(mapping.TypeVarchar), values)
 			mapping.ReplacementScanAddParameter(info, val)
+			for _, v := range values {
+				mapping.DestroyValue(&v)
+			}
 			mapping.DestroyValue(&val)
 		default:
 			mapping.ReplacementScanSetError(info, "unsupported type for replacement scan")

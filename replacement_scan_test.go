@@ -44,7 +44,7 @@ func TestReplacementScanList(t *testing.T) {
 	defer closeConnectorWrapper(t, c)
 
 	RegisterReplacementScan(c, func(tableName string) (string, []any, error) {
-		return "read_text", []any{[]string{"testdata/testA.txt", "testdata/testB.txt"}}, nil
+		return "read_text", []any{[]string{"testdata/replacement_scan_test_file_a.txt", "testdata/replacement_scan_test_file_b.txt"}}, nil
 	})
 
 	db := sql.OpenDB(c)
