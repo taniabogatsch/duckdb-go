@@ -16,7 +16,7 @@ type (
 		Init() ParallelTableSourceInfo
 		// NewLocalState returns a thread-local execution state.
 		// It must return a pointer or a reference type for correct state updates.
-		// go-duckdb does not prevent non-reference values.
+		// duckdb-go does not prevent non-reference values.
 		NewLocalState() any
 	}
 
@@ -28,7 +28,7 @@ type (
 
 	// A RowTableSource represents anything that produces rows in a non-vectorised way.
 	// The cardinality is requested before function initialization.
-	// After initializing the RowTableSource, go-duckdb requests the rows.
+	// After initializing the RowTableSource, duckdb-go requests the rows.
 	// It sequentially calls the FillRow method with a single thread.
 	RowTableSource interface {
 		sequentialTableSource
@@ -39,7 +39,7 @@ type (
 
 	// A ParallelRowTableSource represents anything that produces rows in a non-vectorised way.
 	// The cardinality is requested before function initialization.
-	// After initializing the ParallelRowTableSource, go-duckdb requests the rows.
+	// After initializing the ParallelRowTableSource, duckdb-go requests the rows.
 	// It simultaneously calls the FillRow method with multiple threads.
 	// If ParallelTableSourceInfo.MaxThreads is greater than one, FillRow must use synchronisation
 	// primitives to avoid race conditions.
@@ -52,7 +52,7 @@ type (
 
 	// A ChunkTableSource represents anything that produces rows in a vectorised way.
 	// The cardinality is requested before function initialization.
-	// After initializing the ChunkTableSource, go-duckdb requests the rows.
+	// After initializing the ChunkTableSource, duckdb-go requests the rows.
 	// It sequentially calls the FillChunk method with a single thread.
 	ChunkTableSource interface {
 		sequentialTableSource
@@ -63,7 +63,7 @@ type (
 
 	// A ParallelChunkTableSource represents anything that produces rows in a vectorised way.
 	// The cardinality is requested before function initialization.
-	// After initializing the ParallelChunkTableSource, go-duckdb requests the rows.
+	// After initializing the ParallelChunkTableSource, duckdb-go requests the rows.
 	// It simultaneously calls the FillChunk method with multiple threads.
 	// If ParallelTableSourceInfo.MaxThreads is greater than one, FillChunk must use synchronization
 	// primitives to avoid race conditions.
@@ -93,6 +93,7 @@ type (
 )
 
 // ParallelRow wrapper
+
 func (s parallelRowTSWrapper) ColumnInfos() []ColumnInfo {
 	return s.s.ColumnInfos()
 }
@@ -117,6 +118,7 @@ func (s parallelRowTSWrapper) FillRow(ls any, chunk Row) (bool, error) {
 }
 
 // ParallelChunk wrapper
+
 func (s parallelChunkTSWrapper) ColumnInfos() []ColumnInfo {
 	return s.s.ColumnInfos()
 }

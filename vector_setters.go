@@ -2,12 +2,11 @@ package duckdb
 
 import (
 	"encoding/json"
-	"math/big"
 	"reflect"
 	"strconv"
 	"unsafe"
 
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // secondsPerDay to calculate the days since 1970-01-01.
@@ -81,7 +80,7 @@ func setBool[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	case bool:
 		b = v
 	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(b).String())
+		return castError(reflect.TypeOf(val).String(), reflectTypeBool.String())
 	}
 	setPrimitive(vec, rowIdx, b)
 	return nil
@@ -90,29 +89,29 @@ func setBool[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 func setTS(vec *vector, rowIdx mapping.IdxT, val any) error {
 	switch vec.Type {
 	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_TZ:
-		ts, err := getMappedTimestamp(vec.Type, val)
+		ts, err := inferTimestamp(vec.Type, val)
 		if err != nil {
 			return err
 		}
-		setPrimitive(vec, rowIdx, *ts)
+		setPrimitive(vec, rowIdx, ts)
 	case TYPE_TIMESTAMP_S:
-		ts, err := getMappedTimestampS(val)
+		ts, err := inferTimestampS(val)
 		if err != nil {
 			return err
 		}
-		setPrimitive(vec, rowIdx, *ts)
+		setPrimitive(vec, rowIdx, ts)
 	case TYPE_TIMESTAMP_MS:
-		ts, err := getMappedTimestampMS(val)
+		ts, err := inferTimestampMS(val)
 		if err != nil {
 			return err
 		}
-		setPrimitive(vec, rowIdx, *ts)
+		setPrimitive(vec, rowIdx, ts)
 	case TYPE_TIMESTAMP_NS:
-		ts, err := getMappedTimestampNS(val)
+		ts, err := inferTimestampNS(val)
 		if err != nil {
 			return err
 		}
-		setPrimitive(vec, rowIdx, *ts)
+		setPrimitive(vec, rowIdx, ts)
 	default:
 		return castError(reflect.TypeOf(val).String(), "")
 	}
@@ -120,103 +119,48 @@ func setTS(vec *vector, rowIdx mapping.IdxT, val any) error {
 }
 
 func setDate[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	date, err := getMappedDate(val)
+	date, err := inferDate(val)
 	if err != nil {
 		return err
 	}
-	setPrimitive(vec, rowIdx, *date)
+	setPrimitive(vec, rowIdx, date)
 	return nil
 }
 
 func setTime[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	ticks, err := getTimeTicks(val)
-	if err != nil {
-		return err
-	}
-
 	switch vec.Type {
 	case TYPE_TIME:
-		ti := mapping.NewTime(ticks)
-		setPrimitive(vec, rowIdx, *ti)
+		ti, err := inferTime(val)
+		if err != nil {
+			return err
+		}
+		setPrimitive(vec, rowIdx, ti)
 	case TYPE_TIME_TZ:
 		// The UTC offset is 0.
-		ti := mapping.CreateTimeTZ(ticks, 0)
+		ti, err := inferTimeTZ(val)
+		if err != nil {
+			return err
+		}
 		setPrimitive(vec, rowIdx, ti)
 	}
 	return nil
 }
 
 func setInterval[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	var i Interval
-	switch v := any(val).(type) {
-	case Interval:
-		i = v
-	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(i).String())
+	i, err := inferInterval(val)
+	if err != nil {
+		return err
 	}
-	interval := mapping.NewInterval(i.Months, i.Days, i.Micros)
-	setPrimitive(vec, rowIdx, *interval)
+	setPrimitive(vec, rowIdx, i)
 	return nil
 }
 
 func setHugeint[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	var err error
-	var fv *mapping.HugeInt
-	switch v := any(val).(type) {
-	case uint8:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case int8:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case uint16:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case int16:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case uint32:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case int32:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case uint64:
-		fv = mapping.NewHugeInt(v, 0)
-	case int64:
-		fv, err = hugeIntFromNative(big.NewInt(v))
-		if err != nil {
-			return err
-		}
-	case uint:
-		fv = mapping.NewHugeInt(uint64(v), 0)
-	case int:
-		fv, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return err
-		}
-	case float32:
-		fv, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return err
-		}
-	case float64:
-		fv, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return err
-		}
-	case *big.Int:
-		if v == nil {
-			return castError(reflect.TypeOf(val).String(), reflect.TypeOf(fv).String())
-		}
-		if fv, err = hugeIntFromNative(v); err != nil {
-			return err
-		}
-	case Decimal:
-		if v.Value == nil {
-			return castError(reflect.TypeOf(val).String(), reflect.TypeOf(fv).String())
-		}
-		if fv, err = hugeIntFromNative(v.Value); err != nil {
-			return err
-		}
-	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(fv).String())
+	hi, err := inferHugeInt(val)
+	if err != nil {
+		return err
 	}
-	setPrimitive(vec, rowIdx, *fv)
+	setPrimitive(vec, rowIdx, hi)
 	return nil
 }
 
@@ -260,7 +204,7 @@ func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	case string:
 		str = v
 	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(str).String())
+		return castError(reflect.TypeOf(val).String(), reflectTypeString.String())
 	}
 
 	if v, ok := vec.namesDict[str]; ok {
@@ -275,7 +219,7 @@ func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 			return setNumeric[uint32, int64](vec, rowIdx, v)
 		}
 	} else {
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(str).String())
+		return castError(reflect.TypeOf(val).String(), reflectTypeString.String())
 	}
 	return nil
 }
@@ -289,7 +233,7 @@ func setList[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	// Set the offset and length of the list vector using the current size of the child vector.
 	childVectorSize := mapping.ListVectorGetSize(vec.vec)
 	listEntry := mapping.NewListEntry(uint64(childVectorSize), uint64(len(list)))
-	setPrimitive(vec, rowIdx, *listEntry)
+	setPrimitive(vec, rowIdx, listEntry)
 
 	newLength := mapping.IdxT(len(list)) + childVectorSize
 	vec.resizeListVector(newLength)
@@ -306,7 +250,7 @@ func setStruct[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 
 		// Catch mismatching types.
 		goType := reflect.TypeOf(val)
-		if reflect.TypeOf(val).Kind() != reflect.Struct {
+		if goType.Kind() != reflect.Struct {
 			return castError(goType.String(), reflect.Struct.String())
 		}
 
@@ -350,7 +294,7 @@ func setMap[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	case Map:
 		m = v
 	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(m).String())
+		return castError(reflect.TypeOf(val).String(), reflectTypeMap.String())
 	}
 
 	// Create a LIST of STRUCT values.
@@ -388,24 +332,11 @@ func setSliceChildren(vec *vector, s []any, offset mapping.IdxT) error {
 }
 
 func setUUID[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	var uuid UUID
-	switch v := any(val).(type) {
-	case UUID:
-		uuid = v
-	case *UUID:
-		uuid = *v
-	case []uint8:
-		if len(v) != uuidLength {
-			return castError(reflect.TypeOf(val).String(), reflect.TypeOf(uuid).String())
-		}
-		for i := range uuidLength {
-			uuid[i] = v[i]
-		}
-	default:
-		return castError(reflect.TypeOf(val).String(), reflect.TypeOf(uuid).String())
+	id, err := inferUUID(val)
+	if err != nil {
+		return err
 	}
-	hi := uuidToHugeInt(uuid)
-	setPrimitive(vec, rowIdx, *hi)
+	setPrimitive(vec, rowIdx, id)
 	return nil
 }
 

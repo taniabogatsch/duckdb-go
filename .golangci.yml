@@ -21,6 +21,7 @@ linters:
     - noinlineerr
     - paralleltest
     - testpackage
+    - unqueryvet
     - varnamelen
     - wrapcheck
     - wsl
@@ -60,9 +61,9 @@ formatters:
       sections:
         - standard
         - default
-        - prefix(github.com/marcboeker/go-duckdb)
+        - prefix(github.com/duckdb/duckdb-go)
     gofumpt:
       extra-rules: true
     goimports:
       local-prefixes:
-        - github.com/marcboeker/go-duckdb
+        - github.com/duckdb/duckdb-go

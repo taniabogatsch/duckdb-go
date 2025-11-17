@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 func TestSetGetPrimitive(t *testing.T) {

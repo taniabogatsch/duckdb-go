@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/marcboeker/go-duckdb/v2"
+	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 var db *sql.DB
@@ -69,7 +69,7 @@ func main() {
 	testPreparedStmt()
 }
 
-func check(args ...interface{}) {
+func check(args ...any) {
 	err := args[len(args)-1]
 	if err != nil {
 		panic(err)

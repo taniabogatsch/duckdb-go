@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,6 +89,12 @@ func closePreparedWrapper[T require.TestingT](t T, stmt *sql.Stmt) {
 
 func newAppenderWrapper[T require.TestingT](t T, conn *driver.Conn, schema, table string) *Appender {
 	a, err := NewAppenderFromConn(*conn, schema, table)
+	require.NoError(t, err)
+	return a
+}
+
+func newQueryAppenderWrapper[T require.TestingT](t T, conn *driver.Conn, query, table string, colTypes []TypeInfo, colNames []string) *Appender {
+	a, err := NewQueryAppender(*conn, query, table, colTypes, colNames)
 	require.NoError(t, err)
 	return a
 }
@@ -225,7 +232,7 @@ func ExampleNewConnector() {
 	}()
 
 	var value string
-	row := db.QueryRow(`SELECT value FROM duckdb_settings() WHERE name = 'memory_limit'`)
+	row := db.QueryRow(`SELECT value FROM duckdb_settings() WHERE name = 'max_memory'`)
 	if row.Scan(&value) != nil {
 		log.Fatalf("failed to scan row: %s", err)
 	}
@@ -346,7 +353,7 @@ func TestQuery(t *testing.T) {
 		require.NoError(t, err)
 		ra, err := res.RowsAffected()
 		require.NoError(t, err)
-		require.Equal(t, int64(100000), ra)
+		require.Equal(t, int64(0), ra)
 
 		r, err := db.Query(`SELECT i FROM integers ORDER BY i ASC`)
 		require.NoError(t, err)
@@ -822,10 +829,11 @@ func TestHugeUnionQuery(t *testing.T) {
 	db := openDbWrapper(t, ``)
 	defer closeDbWrapper(t, db)
 
+	var query strings.Builder
+	query.WriteString(`SELECT 1`)
 	part := ` UNION SELECT 1`
-	query := `SELECT 1`
 	for range 350 {
-		query += part
+		query.WriteString(part)
 	}
 
 	wg := sync.WaitGroup{}
@@ -833,7 +841,7 @@ func TestHugeUnionQuery(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r, err := db.Query(query)
+			r, err := db.Query(query.String())
 			require.NoError(t, err)
 			defer closeRowsWrapper(t, r)
 			require.True(t, r.Next())

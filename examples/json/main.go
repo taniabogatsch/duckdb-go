@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/marcboeker/go-duckdb/v2"
+	"github.com/duckdb/duckdb-go/v2"
 )
 
 var db *sql.DB
@@ -36,7 +36,7 @@ func main() {
 	log.Printf("coolness: %f", jsonMap.Get()["coolness"])
 }
 
-func check(args ...interface{}) {
+func check(args ...any) {
 	err := args[len(args)-1]
 	if err != nil {
 		panic(err)

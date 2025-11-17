@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
-	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -307,7 +306,7 @@ func TestTypes(t *testing.T) {
 	require.Len(t, actualRows, len(expectedRows))
 }
 
-// NOTE: go-duckdb only contains very few benchmarks. The purpose of those benchmarks is to avoid regressions
+// NOTE: duckdb-go only contains very few benchmarks. The purpose of those benchmarks is to avoid regressions
 // of its main functionalities. I.e., functions related to implementing the database/sql interface.
 var benchmarkTypesResult []testTypesRow
 
@@ -318,7 +317,7 @@ func BenchmarkTypes(b *testing.B) {
 
 	var r []testTypesRow
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		r = testTypes(b, db, a, expectedRows)
 		testTypesReset(b, c)
 	}
@@ -1010,8 +1009,8 @@ func TestJSONColType(t *testing.T) {
 	require.Len(t, columnTypes, 2)
 	require.Equal(t, aliasJSON, columnTypes[0].DatabaseTypeName())
 	require.Equal(t, typeToStringMap[TYPE_BIGINT], columnTypes[1].DatabaseTypeName())
-	require.Equal(t, reflect.TypeOf((*any)(nil)).Elem(), columnTypes[0].ScanType())
-	require.Equal(t, reflect.TypeOf(int64(0)), columnTypes[1].ScanType())
+	require.Equal(t, reflectTypeAny, columnTypes[0].ScanType())
+	require.Equal(t, reflectTypeInt64, columnTypes[1].ScanType())
 }
 
 func TestUnionTypes(t *testing.T) {
@@ -1097,4 +1096,51 @@ func TestUnionTypes(t *testing.T) {
 		require.Equal(t, "a", val.Tag)
 		require.Equal(t, int32(123), val.Value)
 	})
+}
+
+func TestInferPrimitiveType(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	testCases := []struct {
+		input any
+	}{
+		{[]Map{nil}},
+		{[]bool{true, false}},
+		{[]int8{-7}},
+		{[]int16{-42}},
+		{[]int32{-4}},
+		{[]int64{-6}},
+		{[]int{-22}},
+		{[]uint8{7}},
+		{[]uint16{42}},
+		{[]uint32{4}},
+		{[]uint64{6}},
+		{[]uint{22}},
+		{[]float32{7.8}},
+		{[]float64{22.3}},
+		{[]string{"Hello from Amsterdam!"}},
+		{[][]byte{{71, 111}}},
+		{[]time.Time{time.Now()}},
+		{[]Interval{{22, 10, 7}}},
+		{[]*big.Int{big.NewInt(22)}},
+		{[]Decimal{{2, 2, big.NewInt(7)}}},
+		{[]UUID{UUID(uuid.New())}},
+	}
+	for _, tc := range testCases {
+		_, err := db.Exec(`SELECT a FROM (VALUES (?)) t(a)`, tc.input)
+		require.NoError(t, err)
+	}
+
+	// Not yet supported.
+	testCases = []struct {
+		input any
+	}{
+		{[]Union{{42, "n"}}},
+		{[]Map{map[any]any{"hello": "world", "beautiful": "day"}}},
+	}
+	for _, tc := range testCases {
+		_, err := db.Exec(`SELECT a FROM (VALUES (?)) t(a)`, tc.input)
+		require.ErrorContains(t, err, unsupportedTypeErrMsg)
+	}
 }

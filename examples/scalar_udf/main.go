@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/marcboeker/go-duckdb/v2"
+	"github.com/duckdb/duckdb-go/v2"
 )
 
 // Overload my_length with two user-defined scalar functions.
@@ -158,7 +158,7 @@ func main() {
 	wrapSumScalarUDF()
 }
 
-func check(args ...interface{}) {
+func check(args ...any) {
 	err := args[len(args)-1]
 	if err != nil {
 		panic(err)

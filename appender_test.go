@@ -799,7 +799,7 @@ func TestAppendToCatalog(t *testing.T) {
 	conn := openConnWrapper(t, db, context.Background())
 	defer closeConnWrapper(t, conn)
 
-	err = conn.Raw(func(anyConn interface{}) error {
+	err = conn.Raw(func(anyConn any) error {
 		driverConn := anyConn.(driver.Conn)
 		a, innerErr := NewAppender(driverConn, "other", "", "test")
 		require.NoError(t, innerErr)
@@ -857,7 +857,7 @@ func TestAppenderWithJSON(t *testing.T) {
 	defer cleanupAppender(t, c, db, conn, a)
 
 	for _, jsonInput := range jsonInputs {
-		var jsonData map[string]interface{}
+		var jsonData map[string]any
 		err := json.Unmarshal(jsonInput, &jsonData)
 		require.NoError(t, err)
 		require.NoError(t, a.AppendRow(jsonData["c1"], jsonData["l1"], jsonData["s1"], jsonData["l2"]))
@@ -873,10 +873,10 @@ func TestAppenderWithJSON(t *testing.T) {
 	i := 0
 	for res.Next() {
 		var (
-			c1 interface{}
-			l1 interface{}
-			s1 interface{}
-			l2 interface{}
+			c1 any
+			l1 any
+			s1 any
+			l2 any
 		)
 		err := res.Scan(&c1, &l1, &s1, &l2)
 		require.NoError(t, err)
@@ -963,6 +963,106 @@ func TestAppenderAppendDataChunk(t *testing.T) {
 	require.NoError(t, a.Flush())
 }
 
+func TestAppenderUpsert(t *testing.T) {
+	c := newConnectorWrapper(t, ``, nil)
+	defer closeConnectorWrapper(t, c)
+
+	// Create a table with a PK for UPSERT.
+	db := sql.OpenDB(c)
+	defer closeDbWrapper(t, db)
+	_, err := db.Exec(`
+		CREATE TABLE test (
+			id INT PRIMARY KEY,
+			u UNION(num INT, str VARCHAR)
+	)`)
+	require.NoError(t, err)
+
+	conn := openDriverConnWrapper(t, c)
+	defer closeDriverConnWrapper(t, &conn)
+
+	// Create the types.
+	intType, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
+	varcharType, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
+
+	memberTypes := []TypeInfo{intType, varcharType}
+	memberNames := []string{"num", "str"}
+	unionType, err := NewUnionInfo(memberTypes, memberNames)
+	require.NoError(t, err)
+
+	// Create the INSERT query appender.
+	query := `INSERT INTO test SELECT col1, col2 FROM appended_data`
+	colTypes := []TypeInfo{intType, unionType}
+	aInsert := newQueryAppenderWrapper(t, &conn, query, "", colTypes, []string{})
+
+	// Close without appending anything.
+	closeAppenderWrapper(t, aInsert)
+
+	// Create again and try to append with mismatching column names.
+	aInsert = newQueryAppenderWrapper(t, &conn, query, "", colTypes, []string{"a", "b"})
+	require.NoError(t, aInsert.AppendRow(0, Union{Value: "str1", Tag: "str"}))
+	require.ErrorContains(t, aInsert.Close(), "Referenced column \"col1\" not found in FROM clause!")
+
+	// Now re-create and test "normally".
+	aInsert = newQueryAppenderWrapper(t, &conn, query, "", colTypes, []string{})
+
+	// Append and insert (flush) two rows.
+	require.NoError(t, aInsert.AppendRow(0, Union{Value: "str1", Tag: "str"}))
+	require.NoError(t, aInsert.AppendRow(1, Union{Value: 42, Tag: "num"}))
+	require.NoError(t, aInsert.Flush())
+
+	// Create another INSERT appender selecting only some columns.
+	query = `INSERT INTO test SELECT id + 10, u FROM appended_data`
+	colTypes = []TypeInfo{intType, unionType, intType}
+	colNames := []string{"id", "u", "other"}
+	aInsertOther := newQueryAppenderWrapper(t, &conn, query, "", colTypes, colNames)
+	defer closeAppenderWrapper(t, aInsertOther)
+
+	// Append and insert (flush) two rows.
+	require.NoError(t, aInsertOther.AppendRow(10, Union{Value: "str10", Tag: "str"}, 101))
+	require.NoError(t, aInsertOther.AppendRow(11, Union{Value: 50, Tag: "num"}, 102))
+	require.NoError(t, aInsertOther.Flush())
+
+	// Create the UPSERT query appender.
+	query = `INSERT INTO test SELECT * FROM my_append_tbl ON CONFLICT DO UPDATE SET u = EXCLUDED.u;`
+	colTypes = []TypeInfo{intType, unionType}
+	aUpsert := newQueryAppenderWrapper(t, &conn, query, "my_append_tbl", colTypes, []string{})
+	defer closeAppenderWrapper(t, aUpsert)
+
+	// Append and upsert (flush) two rows.
+	require.NoError(t, aUpsert.AppendRow(2, Union{Value: "str2", Tag: "str"}))
+	require.NoError(t, aUpsert.AppendRow(0, Union{Value: 43, Tag: "num"}))
+	require.NoError(t, aUpsert.Flush())
+
+	// Verify results.
+	res, err := db.QueryContext(context.Background(), `SELECT id, u FROM test ORDER BY id`)
+	require.NoError(t, err)
+	defer closeRowsWrapper(t, res)
+
+	testCases := []struct {
+		id int32
+		u  Union
+	}{
+		{0, Union{Value: int32(43), Tag: "num"}},
+		{1, Union{Value: int32(42), Tag: "num"}},
+		{2, Union{Value: "str2", Tag: "str"}},
+		{20, Union{Value: "str10", Tag: "str"}},
+		{21, Union{Value: int32(50), Tag: "num"}},
+	}
+
+	i := 0
+	for res.Next() {
+		var id int32
+		var u Union
+		require.NoError(t, res.Scan(&id, &u))
+		require.Equal(t, testCases[i].id, id)
+		require.Equal(t, testCases[i].u, u)
+		i++
+	}
+	require.Equal(t, len(testCases), i)
+}
+
 func BenchmarkAppenderNested(b *testing.B) {
 	c, db, conn, a := prepareAppender(b, createNestedDataTableSQL)
 	defer cleanupAppender(b, c, db, conn, a)
@@ -971,7 +1071,7 @@ func BenchmarkAppenderNested(b *testing.B) {
 	rowsToAppend := prepareNestedData(rowCount)
 
 	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		appendNestedData(b, a, rowsToAppend)
 	}
 	b.StopTimer()

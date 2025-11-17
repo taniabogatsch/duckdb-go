@@ -1,7 +1,7 @@
 package duckdb
 
 import (
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // Row represents one row in duckdb.

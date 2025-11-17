@@ -2,7 +2,7 @@ package duckdb
 
 import "C"
 import (
-	"github.com/marcboeker/go-duckdb/mapping"
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // DataChunk storage of a DuckDB table.
