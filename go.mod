@@ -1,6 +1,6 @@
 module github.com/duckdb/duckdb-go/v2
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/apache/arrow-go/v18 v18.4.1
