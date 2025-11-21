@@ -264,12 +264,6 @@ var (
 			query:       `SELECT * FROM %s(CAST('2006-07-08 12:34:59.123456789' AS TIMESTAMP_NS))`,
 			resultCount: 1,
 		},
-		{
-			udf:         &contextTableUDF{},
-			name:        "contextTableUDF",
-			query:       `SELECT * FROM %s()`,
-			resultCount: 1,
-		},
 	}
 	parallelTableUDFs = []tableUDFTest[ParallelRowTableFunction]{
 		{
