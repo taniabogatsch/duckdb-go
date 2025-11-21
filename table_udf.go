@@ -207,11 +207,12 @@ func udfBindTyped[T tableSource](infoPtr unsafe.Pointer) {
 
 	var instance T
 	var err error
-	if f.BindArgumentsContext != nil {
+	switch {
+	case f.BindArgumentsContext != nil:
 		instance, err = f.BindArgumentsContext(ctx, namedArgs, args...)
-	} else if f.BindArguments != nil {
+	case f.BindArguments != nil:
 		instance, err = f.BindArguments(namedArgs, args...)
-	} else {
+	default:
 		// We should never reach here due to checks during registration.
 		panic("unreachable: no bind function defined")
 	}
