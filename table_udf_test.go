@@ -1020,3 +1020,30 @@ func TestContextTableUDF(t *testing.T) {
 	require.Equal(t, uint64(999), result)
 	require.False(t, res.Next())
 }
+
+func TestContextTableUDFPrepared(t *testing.T) {
+	db := openDbWrapper(t, `?access_mode=READ_WRITE`)
+	defer closeDbWrapper(t, db)
+
+	conn := openConnWrapper(t, db, context.Background())
+	defer closeConnWrapper(t, conn)
+
+	var udf contextTableUDF
+	err := RegisterTableUDF(conn, "context_table_udf", udf.GetFunction())
+	require.NoError(t, err)
+
+	stmt, err := db.PrepareContext(context.Background(), `SELECT * FROM context_table_udf()`)
+	require.NoError(t, err)
+	defer closePreparedWrapper(t, stmt)
+
+	ctx := context.WithValue(context.Background(), testCtxKey, uint64(222))
+	res, err := stmt.QueryContext(ctx)
+	require.NoError(t, err)
+	defer closeRowsWrapper(t, res)
+
+	var result uint64
+	require.True(t, res.Next())
+	require.NoError(t, res.Scan(&result))
+	require.Equal(t, uint64(222), result)
+	require.False(t, res.Next())
+}

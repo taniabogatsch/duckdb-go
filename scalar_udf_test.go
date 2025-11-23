@@ -488,6 +488,34 @@ func TestGetConnIdScalarUDF(t *testing.T) {
 	require.True(t, res)
 }
 
+func TestGetConnIdScalarUDFPrepared(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	conn := openConnWrapper(t, db, context.Background())
+	defer closeConnWrapper(t, conn)
+	connId, err := ConnId(conn)
+	require.NoError(t, err)
+
+	currentInfo, err = NewTypeInfo(TYPE_UBIGINT)
+	require.NoError(t, err)
+
+	var udf *getConnIdUDF
+	err = RegisterScalarUDF(conn, "get_conn_id", udf)
+	require.NoError(t, err)
+
+	ctx := context.WithValue(context.Background(), testCtxKey, connId)
+
+	var connIdRes uint64
+	stmt, err := conn.PrepareContext(ctx, `SELECT get_conn_id() AS connId`)
+	require.NoError(t, err)
+	defer stmt.Close()
+
+	row := stmt.QueryRowContext(ctx)
+	require.NoError(t, row.Scan(&connIdRes))
+	require.Equal(t, connId, connIdRes)
+}
+
 func TestErrScalarUDF(t *testing.T) {
 	db := openDbWrapper(t, ``)
 	defer closeDbWrapper(t, db)
