@@ -108,6 +108,8 @@ func (a *Arrow) QueryContext(ctx context.Context, query string, args ...any) (ar
 	return recordReaderFromRows(ctx, rows)
 }
 
+var errArrowScan = errors.New("could not register arrow view due to arrow scan API failure")
+
 // RegisterView registers an Arrow record reader as a view with the given name in DuckDB.
 // The returned release function must be called to release the memory once the view is no longer needed.
 func (a *Arrow) RegisterView(reader array.RecordReader, name string) (release func(), err error) {
