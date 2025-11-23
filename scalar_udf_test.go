@@ -509,7 +509,7 @@ func TestGetConnIdScalarUDFPrepared(t *testing.T) {
 	var connIdRes uint64
 	stmt, err := conn.PrepareContext(ctx, `SELECT get_conn_id() AS connId`)
 	require.NoError(t, err)
-	defer stmt.Close()
+	defer closePreparedWrapper(t, stmt)
 
 	row := stmt.QueryRowContext(ctx)
 	require.NoError(t, row.Scan(&connIdRes))

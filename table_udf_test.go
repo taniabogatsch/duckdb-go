@@ -1032,11 +1032,12 @@ func TestContextTableUDFPrepared(t *testing.T) {
 	err := RegisterTableUDF(conn, "context_table_udf", udf.GetFunction())
 	require.NoError(t, err)
 
-	stmt, err := db.PrepareContext(context.Background(), `SELECT * FROM context_table_udf()`)
+	ctx := context.WithValue(context.Background(), testCtxKey, uint64(222))
+
+	stmt, err := db.PrepareContext(ctx, `SELECT * FROM context_table_udf()`)
 	require.NoError(t, err)
 	defer closePreparedWrapper(t, stmt)
 
-	ctx := context.WithValue(context.Background(), testCtxKey, uint64(222))
 	res, err := stmt.QueryContext(ctx)
 	require.NoError(t, err)
 	defer closeRowsWrapper(t, res)
