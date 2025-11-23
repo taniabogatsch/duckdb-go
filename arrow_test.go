@@ -260,13 +260,13 @@ func TestArrow(t *testing.T) {
 		require.NoError(t, rdr.Err())
 
 		rdr.Retain()
-		require.Equal(t, int64(2), rdr.(*duckdbArrowReader).refCount)
+		require.Equal(t, int64(2), rdr.(*recordReader).refCount)
 		rdr.Release()
-		require.Equal(t, int64(1), rdr.(*duckdbArrowReader).refCount)
+		require.Equal(t, int64(1), rdr.(*recordReader).refCount)
 		rdr.Release()
-		require.Equal(t, int64(0), rdr.(*duckdbArrowReader).refCount)
+		require.Equal(t, int64(0), rdr.(*recordReader).refCount)
 		rdr.Release()
-		require.Equal(t, int64(0), rdr.(*duckdbArrowReader).refCount)
+		require.Equal(t, int64(0), rdr.(*recordReader).refCount)
 	})
 }
 

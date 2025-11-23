@@ -127,7 +127,7 @@ func (a *Arrow) RegisterView(reader array.RecordReader, name string) (release fu
 	}
 	if arrowmapping.ArrowScan(a.conn.conn, name, arrowStream) == mapping.StateError {
 		release()
-		return nil, errors.New("duckdb_arrow_scan")
+		return nil, errArrowScan
 	}
 
 	return release, nil
@@ -146,12 +146,12 @@ func (a *Arrow) anyArgsToNamedArgs(args []any) []driver.NamedValue {
 	return argsToNamedArgs(values)
 }
 
-var _ array.RecordReader = (*duckdbArrowReader)(nil)
+var _ array.RecordReader = (*recordReader)(nil)
 
-type duckdbArrowReader struct {
+type recordReader struct {
 	ctx    context.Context
 	res    mapping.Result
-	opts   *arrowmapping.ArrowOptions
+	opts   arrowmapping.ArrowOptions
 	schema *arrow.Schema
 	rows   *rows
 
@@ -192,21 +192,21 @@ func recordReaderFromRows(ctx context.Context, from driver.Rows) (array.RecordRe
 	schema, ed := arrowmapping.NewArrowSchema(arrowOptions, types, names)
 	defer mapping.DestroyErrorData(&ed)
 	if mapping.ErrorDataHasError(ed) {
-		return nil, fmt.Errorf("failed to create arrow schema: %w",
-			getDuckDBError(mapping.ErrorDataMessage(ed)))
+		defer arrowmapping.DestroyArrowOptions(&arrowOptions)
+		return nil, fmt.Errorf("failed to create arrow schema: %w", errorDataError(ed))
 	}
 
-	return &duckdbArrowReader{
+	return &recordReader{
 		ctx:      ctx,
 		res:      rr.res,
-		opts:     &arrowOptions,
+		opts:     arrowOptions,
 		schema:   schema,
 		rows:     rr,
 		refCount: 1,
 	}, nil
 }
 
-func (r *duckdbArrowReader) Retain() {
+func (r *recordReader) Retain() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.err != nil || r.closed {
@@ -215,7 +215,7 @@ func (r *duckdbArrowReader) Retain() {
 	r.refCount++
 }
 
-func (r *duckdbArrowReader) Release() {
+func (r *recordReader) Release() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -231,19 +231,17 @@ func (r *duckdbArrowReader) Release() {
 	r.closed = true
 	if r.current != nil {
 		r.current.Release()
+		r.current = nil
 	}
-	if r.opts != nil {
-		arrowmapping.DestroyArrowOptions(r.opts)
-		r.opts = nil
-	}
+	arrowmapping.DestroyArrowOptions(&r.opts)
 	r.err = r.rows.Close()
 }
 
-func (r *duckdbArrowReader) Schema() *arrow.Schema {
+func (r *recordReader) Schema() *arrow.Schema {
 	return r.schema
 }
 
-func (r *duckdbArrowReader) Next() bool {
+func (r *recordReader) Next() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -270,10 +268,10 @@ func (r *duckdbArrowReader) Next() bool {
 			return false
 		}
 		defer mapping.DestroyDataChunk(&chunk)
-		rec, ed := arrowmapping.DataChunkToArrowArray(*r.opts, r.schema, chunk)
+		rec, ed := arrowmapping.DataChunkToArrowArray(r.opts, r.schema, chunk)
 		defer mapping.DestroyErrorData(&ed)
 		if mapping.ErrorDataHasError(ed) {
-			r.err = fmt.Errorf("failed to create arrow array: %w", getDuckDBError(mapping.ErrorDataMessage(ed)))
+			r.err = fmt.Errorf("failed to create arrow array: %w", errorDataError(ed))
 			return false
 		}
 		r.current = rec
@@ -281,11 +279,11 @@ func (r *duckdbArrowReader) Next() bool {
 	}
 }
 
-func (r *duckdbArrowReader) Record() arrow.RecordBatch {
+func (r *recordReader) Record() arrow.RecordBatch {
 	return r.RecordBatch()
 }
 
-func (r *duckdbArrowReader) RecordBatch() arrow.RecordBatch {
+func (r *recordReader) RecordBatch() arrow.RecordBatch {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -295,7 +293,7 @@ func (r *duckdbArrowReader) RecordBatch() arrow.RecordBatch {
 	return r.current
 }
 
-func (r *duckdbArrowReader) Err() error {
+func (r *recordReader) Err() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.err

@@ -144,6 +144,7 @@ var (
 	errTableUDFColumnTypeIsNil = fmt.Errorf("%w: column type is nil", errTableUDFCreate)
 
 	errProfilingInfoEmpty = errors.New("no profiling information available for this connection")
+	errArrowScan          = errors.New("could not register arrow view")
 )
 
 type ErrorType int
