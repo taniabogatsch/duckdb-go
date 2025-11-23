@@ -285,6 +285,7 @@ func table_udf_callback(infoPtr, outputPtr unsafe.Pointer) {
 	instance := getPinned[tableFunctionData](mapping.FunctionGetBindData(info))
 
 	var chunk DataChunk
+	chunk.projection = instance.projection
 	err := chunk.initFromDuckDataChunk(output, true)
 	if err != nil {
 		mapping.FunctionSetError(info, err.Error())

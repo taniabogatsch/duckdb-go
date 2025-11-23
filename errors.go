@@ -35,6 +35,10 @@ func columnCountError(actual, expected int) error {
 	return fmt.Errorf("%s: expected %d, got %d", columnCountErrMsg, expected, actual)
 }
 
+func unprojectedColumnError(colIdx int) error {
+	return fmt.Errorf("%s: column index %d is not projected", columnCountErrMsg, colIdx)
+}
+
 func paramIndexError(idx int, max uint64) error {
 	return fmt.Errorf("%s: %d is out of range [1, %d]", paramIndexErrMsg, idx, max)
 }

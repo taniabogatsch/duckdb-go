@@ -20,7 +20,7 @@ func (r Row) IsProjected(colIdx int) bool {
 // SetRowValue sets the value at colIdx to val.
 // Returns an error on failure, and nil for non-projected columns.
 func SetRowValue[T any](row Row, colIdx int, val T) error {
-	projectedIdx := row.projection[colIdx]
+	projectedIdx := row.chunk.projection[colIdx]
 	if projectedIdx < 0 || projectedIdx >= len(row.chunk.columns) {
 		return nil
 	}
