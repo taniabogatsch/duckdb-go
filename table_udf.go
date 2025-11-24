@@ -297,8 +297,7 @@ func table_udf_callback(infoPtr, outputPtr unsafe.Pointer) {
 	switch fun := instance.fun.(type) {
 	case ParallelRowTableSource:
 		row := Row{
-			chunk:      &chunk,
-			projection: instance.projection,
+			chunk: &chunk,
 		}
 		maxSize := mapping.IdxT(GetDataChunkCapacity())
 

@@ -88,7 +88,7 @@ func SetChunkValue[T any](chunk DataChunk, colIdx, rowIdx int, val T) error {
 		}
 	} else {
 		// Rewrite colIdx for projection
-		colIdx := chunk.projection[colIdx]
+		colIdx = chunk.projection[colIdx]
 		if colIdx < 0 || colIdx >= len(chunk.columns) {
 			return nil
 		}
