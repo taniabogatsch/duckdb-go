@@ -93,19 +93,22 @@ func NewArrowFromConn(driverConn driver.Conn) (*Arrow, error) {
 	return &Arrow{conn: conn}, nil
 }
 
-// QueryContext prepares statements, executes them, returns Apache Arrow array.RecordReader as a result of the last
+// QueryContext prepares statements, executes them, and returns an Apache Arrow array.RecordReader as a result of the last
 // executed statement. Arguments are bound to the last statement.
 func (a *Arrow) QueryContext(ctx context.Context, query string, args ...any) (array.RecordReader, error) {
 	if a.conn.closed {
 		return nil, errClosedCon
 	}
 
-	rows, err := a.conn.QueryContext(ctx, query, a.anyArgsToNamedArgs(args))
+	r, err := a.conn.QueryContext(ctx, query, a.anyArgsToNamedArgs(args))
 	if err != nil {
+		if r != nil {
+			err = errors.Join(err, r.Close())
+		}
 		return nil, err
 	}
 
-	return recordReaderFromRows(ctx, rows)
+	return recordReaderFromRows(ctx, r)
 }
 
 var errArrowScan = errors.New("could not register arrow view due to arrow scan API failure")
@@ -192,10 +195,9 @@ func recordReaderFromRows(ctx context.Context, from driver.Rows) (array.RecordRe
 	}()
 
 	schema, ed := arrowmapping.NewArrowSchema(arrowOptions, types, names)
-	defer mapping.DestroyErrorData(&ed)
-	if mapping.ErrorDataHasError(ed) {
+	if err := errorDataError(ed); err != nil {
 		defer arrowmapping.DestroyArrowOptions(&arrowOptions)
-		return nil, fmt.Errorf("failed to create arrow schema: %w", errorDataError(ed))
+		return nil, fmt.Errorf("failed to create arrow schema: %w", err)
 	}
 
 	return &recordReader{
@@ -271,9 +273,8 @@ func (r *recordReader) Next() bool {
 		}
 		defer mapping.DestroyDataChunk(&chunk)
 		rec, ed := arrowmapping.DataChunkToArrowArray(r.opts, r.schema, chunk)
-		defer mapping.DestroyErrorData(&ed)
-		if mapping.ErrorDataHasError(ed) {
-			r.err = fmt.Errorf("failed to create arrow array: %w", errorDataError(ed))
+		if err := errorDataError(ed); err != nil {
+			r.err = fmt.Errorf("failed to create arrow array: %w", err)
 			return false
 		}
 		r.current = rec
