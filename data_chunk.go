@@ -45,11 +45,14 @@ func (chunk *DataChunk) GetValue(colIdx, rowIdx int) (any, error) {
 		if colIdx >= len(chunk.columns) {
 			return nil, getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
 		}
+	} else if colIdx < 0 || colIdx >= len(chunk.projection) {
+		return nil, getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
 	} else {
 		// Rewrite colIdx for projection
+		origColIdx := colIdx
 		colIdx = chunk.projection[colIdx]
 		if colIdx < 0 || colIdx >= len(chunk.columns) {
-			return nil, getError(errAPI, unprojectedColumnError(colIdx))
+			return nil, getError(errAPI, unprojectedColumnError(origColIdx))
 		}
 	}
 	column := &chunk.columns[colIdx]
@@ -65,6 +68,8 @@ func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 		if colIdx >= len(chunk.columns) {
 			return getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
 		}
+	} else if colIdx < 0 || colIdx >= len(chunk.projection) {
+		return getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
 	} else {
 		// Rewrite colIdx for projection
 		colIdx = chunk.projection[colIdx]
@@ -86,6 +91,8 @@ func SetChunkValue[T any](chunk DataChunk, colIdx, rowIdx int, val T) error {
 		if colIdx >= len(chunk.columns) {
 			return getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
 		}
+	} else if colIdx < 0 || colIdx >= len(chunk.projection) {
+		return getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
 	} else {
 		// Rewrite colIdx for projection
 		colIdx = chunk.projection[colIdx]
