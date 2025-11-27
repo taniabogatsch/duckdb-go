@@ -350,6 +350,9 @@ func getScalarUDFArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo,
 
 	// Get the mapping.Value as a driver.Value and return.
 	arg.Value, err = getValue(v)
+	if err != nil {
+		return arg, err
+	}
 	return arg, nil
 }
 
