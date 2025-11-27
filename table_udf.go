@@ -174,10 +174,10 @@ func udfBindTyped[T tableSource](infoPtr unsafe.Pointer) {
 	args := make([]any, argCount)
 	namedArgs := make(map[string]any)
 
-	for i, t := range config.Arguments {
+	for i := range config.Arguments {
 		var err error
 		value := mapping.BindGetParameter(info, mapping.IdxT(i))
-		args[i], err = getValue(t, value)
+		args[i], err = getValue(value)
 		mapping.DestroyValue(&value)
 
 		if err != nil {
@@ -186,10 +186,10 @@ func udfBindTyped[T tableSource](infoPtr unsafe.Pointer) {
 		}
 	}
 
-	for name, t := range config.NamedArguments {
+	for name := range config.NamedArguments {
 		var err error
 		value := mapping.BindGetNamedParameter(info, name)
-		namedArgs[name], err = getValue(t, value)
+		namedArgs[name], err = getValue(value)
 		mapping.DestroyValue(&value)
 
 		if err != nil {

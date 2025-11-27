@@ -9,8 +9,11 @@ import (
 	"github.com/duckdb/duckdb-go/mapping"
 )
 
-func getValue(info TypeInfo, v mapping.Value) (any, error) {
-	t := info.InternalType()
+func getValue(v mapping.Value) (any, error) {
+	// The logical type is valid as long as v (mapping.Value) is valid,
+	// i.e., it must not be destroyed.
+	lt := mapping.GetValueType(v)
+	t := mapping.GetTypeId(lt)
 	switch t {
 	case TYPE_BOOLEAN:
 		return mapping.GetBool(v), nil
