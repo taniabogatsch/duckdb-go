@@ -105,8 +105,8 @@ func getEasterEgg(ctx context.Context, values []driver.Value) (any, error) {
 		return nil, errors.New("the bind data must be a uint64")
 	}
 
-	if values[0] != nil {
-		customBindData += values[0].(uint64)
+	if values[1] != nil {
+		customBindData += values[1].(uint64)
 	}
 
 	if customBindData == 42 {
@@ -119,7 +119,18 @@ func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (driver.Value, erro
 	if !args[1].Foldable {
 		return nil, errors.New("second argument must be foldable for bindEasterEgg")
 	}
-	return args[1].Value, nil
+	if args[1].Value == nil {
+		return uint64(0), nil
+	}
+
+	switch v := args[1].Value.(type) {
+	case int32:
+		return uint64(v), nil
+	case uint64:
+		return v, nil
+	default:
+		return nil, errors.New("cannot cast second argument to uint64")
+	}
 }
 
 func (*simpleSUDF) Config() ScalarFuncConfig {
@@ -572,7 +583,7 @@ func TestBindScalarUDF(t *testing.T) {
 	defer closeConnWrapper(t, conn)
 
 	var err error
-	currentInfo, err = NewTypeInfo(TYPE_UBIGINT)
+	currentInfo, err = NewTypeInfo(TYPE_VARCHAR)
 	require.NoError(t, err)
 
 	var udf *easterEggUDF
@@ -582,17 +593,17 @@ func TestBindScalarUDF(t *testing.T) {
 	var egg string
 	row := conn.QueryRowContext(context.Background(), `SELECT find_easter_egg(7, 8) AS egg`)
 	require.NoError(t, row.Scan(&egg))
-	require.Equal(t, egg, "15")
+	require.Equal(t, "15", egg)
 
 	row = conn.QueryRowContext(context.Background(), `SELECT find_easter_egg(10, (44 - 12)::UBIGINT) AS egg`)
 	require.NoError(t, row.Scan(&egg))
-	require.Equal(t, egg, "‧₊˚ ⋅ 𓐐𓎩 ‧₊˚ ⋅")
+	require.Equal(t, "‧₊˚ ⋅ 𓐐𓎩 ‧₊˚ ⋅", egg)
 
 	row = conn.QueryRowContext(context.Background(), `SELECT find_easter_egg(NULL, NULL) AS egg`)
 	require.NoError(t, row.Scan(&egg))
-	require.Equal(t, egg, "0")
+	require.Equal(t, "0", egg)
 
-	row = conn.QueryRowContext(context.Background(), `SELECT find_easter_egg(7, random()) AS egg`)
+	row = conn.QueryRowContext(context.Background(), `SELECT find_easter_egg(7, (random() * 100)::UBIGINT) AS egg`)
 	err = row.Scan(&egg)
 	require.ErrorContains(t, err, "second argument must be foldable for bindEasterEgg")
 }

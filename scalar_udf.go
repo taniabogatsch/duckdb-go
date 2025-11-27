@@ -330,6 +330,7 @@ func scalar_udf_bind_callback(bindInfoPtr unsafe.Pointer) {
 func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index mapping.IdxT) (ScalarUDFArg, error) {
 	expr := mapping.ScalarFunctionBindGetArgument(bindInfo, index)
 	defer mapping.DestroyExpression(&expr)
+
 	arg := ScalarUDFArg{
 		Foldable: mapping.ExpressionIsFoldable(expr),
 	}
@@ -337,7 +338,7 @@ func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index m
 		return arg, nil
 	}
 
-	// Fold the argument and return it.
+	// Fold the argument.
 	var v mapping.Value
 	errorData := mapping.ExpressionFold(clientCtx, expr, &v)
 	err := errorDataError(errorData)
@@ -345,13 +346,8 @@ func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index m
 		return arg, err
 	}
 
-	// TODO: generalize value.go getValue() to work here.
-	// TODO: we should be able to get the type info via the logical type,
-	// TODO: either directly from mapping.GetValueType (+recursion), or via the logical type (+recursion) of mapping.ExpressionReturnType,
-	// TODO: which should match the folded type.
-	var assumeThisIsTheExtractedValue any
-	arg.Value = assumeThisIsTheExtractedValue
-
+	// Get the mapping.Value as a driver.Value and return.
+	arg.Value, err = getValue(v)
 	return arg, nil
 }
 
