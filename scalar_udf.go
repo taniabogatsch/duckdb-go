@@ -73,6 +73,7 @@ type (
 	// NOTE: When providing custom bind data, then the first value of the values slice contains the bind data.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
 	// ScalarBinderFn takes a context and the scalar function's arguments.
+	// It returns the custom bind data, which is accessible during execution.
 	ScalarBinderFn func(ctx context.Context, args []ScalarUDFArg) (driver.Value, error)
 )
 
@@ -327,7 +328,7 @@ func scalar_udf_bind_callback(bindInfoPtr unsafe.Pointer) {
 	mapping.ScalarFunctionSetBindData(bindInfo, unsafe.Pointer(&h), deleteCallbackPtr)
 }
 
-func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index mapping.IdxT) (ScalarUDFArg, error) {
+func getScalarUDFArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index mapping.IdxT) (ScalarUDFArg, error) {
 	expr := mapping.ScalarFunctionBindGetArgument(bindInfo, index)
 	defer mapping.DestroyExpression(&expr)
 
@@ -341,6 +342,7 @@ func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index m
 	// Fold the argument.
 	var v mapping.Value
 	errorData := mapping.ExpressionFold(clientCtx, expr, &v)
+	defer mapping.DestroyValue(&v)
 	err := errorDataError(errorData)
 	if err != nil {
 		return arg, err
@@ -353,11 +355,11 @@ func bindArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index m
 
 func (s *scalarFuncContext) bind(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, connId uint64) (driver.Value, error) {
 	ctx := s.ctxStore.load(connId)
-
 	argCount := mapping.ScalarFunctionBindGetArgumentCount(bindInfo)
+
 	var args []ScalarUDFArg
 	for i := mapping.IdxT(0); i < argCount; i++ {
-		arg, err := bindArg(clientCtx, bindInfo, i)
+		arg, err := getScalarUDFArg(clientCtx, bindInfo, i)
 		if err != nil {
 			return nil, err
 		}
