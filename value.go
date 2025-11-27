@@ -66,6 +66,8 @@ func getValue(v mapping.Value) (any, error) {
 		return hugeIntToNative(&hugeInt), nil
 	case TYPE_VARCHAR:
 		return mapping.GetVarchar(v), nil
+	case TYPE_SQLNULL:
+		return nil, nil
 	default:
 		return nil, unsupportedTypeError(typeToStringMap[t])
 	}
