@@ -13,6 +13,10 @@ type Row struct {
 
 // IsProjected returns whether the column is projected.
 func (r Row) IsProjected(colIdx int) bool {
+	if len(r.chunk.projection) == 0 || colIdx < 0 || colIdx >= len(r.chunk.projection) {
+		return false
+	}
+
 	return r.chunk.projection[colIdx] != -1
 }
 

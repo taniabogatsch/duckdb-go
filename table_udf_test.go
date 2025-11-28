@@ -913,7 +913,7 @@ func (udf *chunkPushdownTableUDF) FillChunk(chunk DataChunk) error {
 			return fmt.Errorf("failed to set value for result: %w", err)
 		}
 
-		if err := chunk.SetValue(1, i, nextVal); err != nil { // Multiply by 10 for distinctness
+		if err := chunk.SetValue(1, i, nextVal); err != nil {
 			return fmt.Errorf("failed to set value for result2: %w", err)
 		}
 
