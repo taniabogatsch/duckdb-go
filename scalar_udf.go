@@ -72,9 +72,8 @@ type (
 	// NOTE: When providing custom bind data, then the first value of the values slice contains the bind data.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
 	// ScalarBinderFn takes a context and the scalar function's arguments.
-	// It returns the name of some custom bind data, the value as driver.Value, or an error.
-	// If there is no error, it adds the key-value pair to the context, which is accessible during execution.
-	ScalarBinderFn func(ctx context.Context, args []ScalarUDFArg) (string, driver.Value, error)
+	// It returns the updated context, which can now contain arbitrary data available during execution.
+	ScalarBinderFn func(ctx context.Context, args []ScalarUDFArg) (context.Context, error)
 )
 
 // ScalarFuncExecutor contains the functions to execute a user-defined scalar function.
@@ -359,13 +358,12 @@ func (s *scalarFuncContext) bind(clientCtx mapping.ClientContext, bindInfo mappi
 		args = append(args, arg)
 	}
 
-	key, val, err := s.f.Executor().ScalarBinder(ctx, args)
+	bindCtx, err := s.f.Executor().ScalarBinder(ctx, args)
 	if err != nil {
 		return err
 	}
 
-	ctxWithValue := context.WithValue(ctx, key, val)
-	s.ctxStore.store(connId, ctxWithValue, true)
+	s.ctxStore.store(connId, bindCtx, true)
 	return nil
 }
 

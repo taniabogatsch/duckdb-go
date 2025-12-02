@@ -122,21 +122,24 @@ func getEasterEgg(ctx context.Context, values []driver.Value) (any, error) {
 	return strconv.Itoa(int(customBindData)), nil
 }
 
-func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (string, driver.Value, error) {
+func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (context.Context, error) {
 	if !args[1].Foldable {
-		return "", nil, errors.New("second argument must be foldable for bindEasterEgg")
+		return nil, errors.New("second argument must be foldable for bindEasterEgg")
 	}
 	if args[1].Value == nil {
-		return testBindCtxKey, uint64(0), nil
+		bindCtx := context.WithValue(ctx, testBindCtxKey, uint64(0))
+		return bindCtx, nil
 	}
 
 	switch v := args[1].Value.(type) {
 	case int32:
-		return testBindCtxKey, uint64(v), nil
+		bindCtx := context.WithValue(ctx, testBindCtxKey, uint64(v))
+		return bindCtx, nil
 	case uint64:
-		return testBindCtxKey, v, nil
+		bindCtx := context.WithValue(ctx, testBindCtxKey, v)
+		return bindCtx, nil
 	default:
-		return "", nil, errors.New("cannot cast second argument to uint64")
+		return nil, errors.New("cannot cast second argument to uint64")
 	}
 }
 
