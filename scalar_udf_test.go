@@ -16,7 +16,10 @@ var currentInfo TypeInfo
 
 type testCtxKeyType string
 
-const testCtxKey testCtxKeyType = "test_ctx_key"
+const (
+	testCtxKey     testCtxKeyType = "test_ctx_key"
+	testBindCtxKey                = "test_bind_ctx_key"
+)
 
 type (
 	simpleSUDF        struct{}
@@ -94,19 +97,23 @@ func getEasterEgg(ctx context.Context, values []driver.Value) (any, error) {
 		return nil, errors.New("context is nil for getEasterEgg")
 	}
 
-	// Ensure we have two input arguments plus the custom bind data.
-	if len(values) != 3 {
-		return nil, errors.New("context does not contain the bind data for getEasterEgg")
+	// Ensure we have two input arguments.
+	if len(values) != 2 {
+		return nil, errors.New("invalid argument count")
 	}
 
 	// Get the custom bind data.
-	customBindData, ok := values[0].(uint64)
+	anyCustomBindData := ctx.Value(testBindCtxKey)
+	if anyCustomBindData == nil {
+		return nil, errors.New("custom bind data is nil")
+	}
+	customBindData, ok := anyCustomBindData.(uint64)
 	if !ok {
-		return nil, errors.New("the bind data must be a uint64")
+		return nil, errors.New("custom bind data must be uint64")
 	}
 
-	if values[1] != nil {
-		customBindData += values[1].(uint64)
+	if values[0] != nil {
+		customBindData += values[0].(uint64)
 	}
 
 	if customBindData == 42 {
@@ -115,21 +122,21 @@ func getEasterEgg(ctx context.Context, values []driver.Value) (any, error) {
 	return strconv.Itoa(int(customBindData)), nil
 }
 
-func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (driver.Value, error) {
+func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (string, driver.Value, error) {
 	if !args[1].Foldable {
-		return nil, errors.New("second argument must be foldable for bindEasterEgg")
+		return "", nil, errors.New("second argument must be foldable for bindEasterEgg")
 	}
 	if args[1].Value == nil {
-		return uint64(0), nil
+		return testBindCtxKey, uint64(0), nil
 	}
 
 	switch v := args[1].Value.(type) {
 	case int32:
-		return uint64(v), nil
+		return testBindCtxKey, uint64(v), nil
 	case uint64:
-		return v, nil
+		return testBindCtxKey, v, nil
 	default:
-		return nil, errors.New("cannot cast second argument to uint64")
+		return "", nil, errors.New("cannot cast second argument to uint64")
 	}
 }
 
