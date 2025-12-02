@@ -219,7 +219,7 @@ func scalar_udf_callback(functionInfoPtr, inputPtr, outputPtr unsafe.Pointer) {
 		// Get each column value.
 		var err error
 		nullRow := false
-		for colIdx := 0; colIdx < length; colIdx++ {
+		for colIdx := range length {
 			if values[colIdx], err = inputChunk.GetValue(colIdx, rowIdx); err != nil {
 				mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
 				return

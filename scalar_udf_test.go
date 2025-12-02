@@ -18,7 +18,7 @@ type testCtxKeyType string
 
 const (
 	testCtxKey     testCtxKeyType = "test_ctx_key"
-	testBindCtxKey                = "test_bind_ctx_key"
+	testBindCtxKey testCtxKeyType = "test_bind_ctx_key"
 )
 
 type (
