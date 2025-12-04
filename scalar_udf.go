@@ -315,8 +315,8 @@ func scalar_udf_bind_callback(bindInfoPtr unsafe.Pointer) {
 	mapping.ScalarFunctionSetBindData(bindInfo, unsafe.Pointer(&h), deleteCallbackPtr)
 }
 
-func getScalarUDFArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index mapping.IdxT) (ScalarUDFArg, error) {
-	expr := mapping.ScalarFunctionBindGetArgument(bindInfo, index)
+func getScalarUDFArg(clientCtx mapping.ClientContext, bindInfo mapping.BindInfo, index int) (ScalarUDFArg, error) {
+	expr := mapping.ScalarFunctionBindGetArgument(bindInfo, mapping.IdxT(index))
 	defer mapping.DestroyExpression(&expr)
 
 	arg := ScalarUDFArg{
@@ -348,7 +348,7 @@ func (s *scalarFuncContext) bind(clientCtx mapping.ClientContext, bindInfo mappi
 	argCount := mapping.ScalarFunctionBindGetArgumentCount(bindInfo)
 
 	var args []ScalarUDFArg
-	for i := mapping.IdxT(0); i < argCount; i++ {
+	for i := range int(argCount) {
 		arg, err := getScalarUDFArg(clientCtx, bindInfo, i)
 		if err != nil {
 			return err
