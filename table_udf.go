@@ -143,12 +143,12 @@ func isRowIdColumn(i mapping.IdxT) bool {
 
 func (tfd *tableFunctionData) setColumnCount(info mapping.InitInfo) {
 	count := mapping.InitGetColumnCount(info)
-	for i := mapping.IdxT(0); i < count; i++ {
-		srcPos := mapping.InitGetColumnIndex(info, i)
+	for i := range int(count) {
+		srcPos := mapping.InitGetColumnIndex(info, mapping.IdxT(i))
 		// FIXME: Special-case, should just work post duckdb v1.3.0.
 		// See: https://github.com/duckdb/duckdb/pull/16248
 		if !isRowIdColumn(srcPos) {
-			tfd.projection[int(srcPos)] = int(i)
+			tfd.projection[int(srcPos)] = i
 		}
 	}
 }

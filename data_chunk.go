@@ -112,12 +112,11 @@ func (chunk *DataChunk) initFromDuckDataChunk(inputChunk mapping.DataChunk, writ
 	chunk.chunk = inputChunk
 
 	var err error
-	for i := mapping.IdxT(0); i < columnCount; i++ {
-		vec := mapping.DataChunkGetVector(inputChunk, i)
-
-		// Initialize the callback functions to read and write values.
+	for i := range len(chunk.columns) {
+		// Get the vector and initialize the callback functions to read and write values.
+		vec := mapping.DataChunkGetVector(inputChunk, mapping.IdxT(i))
 		logicalType := mapping.VectorGetColumnType(vec)
-		err = chunk.columns[i].init(logicalType, int(i))
+		err = chunk.columns[i].init(logicalType, i)
 		mapping.DestroyLogicalType(&logicalType)
 		if err != nil {
 			break
