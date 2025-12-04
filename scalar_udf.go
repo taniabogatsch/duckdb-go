@@ -65,11 +65,9 @@ type ScalarUDFArg struct {
 type (
 	// RowExecutorFn is the type for any row-based execution function.
 	// It takes the row values and returns the row execution result, or error.
-	// NOTE: When providing custom bind data, then the first value of the values slice contains the bind data.
 	RowExecutorFn func(values []driver.Value) (any, error)
 	// RowContextExecutorFn accepts a row-based execution function using a context.
 	// It takes a context and the row values, and returns the row execution result, or error.
-	// NOTE: When providing custom bind data, then the first value of the values slice contains the bind data.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
 	// ScalarBinderFn takes a context and the scalar function's arguments.
 	// It returns the updated context, which can now contain arbitrary data available during execution.
