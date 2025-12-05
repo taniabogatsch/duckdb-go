@@ -1,6 +1,7 @@
 package duckdb
 
 import "C"
+
 import (
 	"errors"
 
@@ -98,7 +99,7 @@ func (chunk *DataChunk) verifyAndRewriteColIdx(colIdx int) (int, error) {
 		origColIdx := colIdx
 		colIdx = chunk.projection[colIdx]
 		if !inBounds(chunk.columns, colIdx) {
-			return colIdx, newUnprojectedColumnErr(origColIdx)
+			return colIdx, newUnprojectedColumnError(origColIdx)
 		}
 	}
 

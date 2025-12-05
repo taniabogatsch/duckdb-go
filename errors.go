@@ -285,22 +285,22 @@ func getDuckDBError(errMsg string) error {
 	}
 }
 
-type unprojectedColumnErr struct {
+type unprojectedColumnError struct {
 	Index int
 }
 
-func (e *unprojectedColumnErr) Error() string {
+func (e *unprojectedColumnError) Error() string {
 	return fmt.Sprintf("unprojected column: index %d is not projected", e.Index)
 }
 
 // sentinel value for errors.Is
-var errUnprojectedColumn = &unprojectedColumnErr{Index: -1}
+var errUnprojectedColumn = &unprojectedColumnError{Index: -1}
 
 // constructor that wraps the sentinel with context
-func newUnprojectedColumnErr(index int) error {
+func newUnprojectedColumnError(index int) error {
 	if index == -1 {
 		// avoid returning the sentinel directly for real index -1
-		return &unprojectedColumnErr{Index: index}
+		return &unprojectedColumnError{Index: index}
 	}
 	// wrap the sentinel so errors.Is works, but keep the index in the concrete error
 	return fmt.Errorf("%w: index %d", errUnprojectedColumn, index)
