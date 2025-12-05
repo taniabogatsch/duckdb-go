@@ -877,11 +877,11 @@ func (udf *chunkPushdownTableUDF) GetFunction() ChunkTableFunction {
 		Config: TableFunctionConfig{
 			Arguments: []TypeInfo{typeBigintTableUDF},
 		},
-		BindArguments: bindchunkPushdownTableUDF,
+		BindArguments: bindChunk,
 	}
 }
 
-func bindchunkPushdownTableUDF(namedArgs map[string]any, args ...any) (ChunkTableSource, error) {
+func bindChunk(namedArgs map[string]any, args ...any) (ChunkTableSource, error) {
 	return &chunkPushdownTableUDF{
 		count: 0,
 		n:     args[0].(int64),

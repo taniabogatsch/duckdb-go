@@ -2,6 +2,8 @@ package duckdb
 
 import "C"
 import (
+	"errors"
+
 	"github.com/duckdb/duckdb-go/mapping"
 )
 
@@ -41,21 +43,9 @@ func (chunk *DataChunk) SetSize(size int) error {
 
 // GetValue returns a single value of a column.
 func (chunk *DataChunk) GetValue(colIdx, rowIdx int) (any, error) {
-	if chunk.projection == nil && (colIdx < 0 || colIdx >= len(chunk.columns)) {
-		return nil, getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
-	}
-
-	if chunk.projection != nil && (colIdx < 0 || colIdx >= len(chunk.projection)) {
-		return nil, getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
-	}
-
-	// Rewrite colIdx for projection, if provided. Otherwise, use as is for bwc.
-	if chunk.projection != nil {
-		origColIdx := colIdx
-		colIdx = chunk.projection[colIdx]
-		if colIdx < 0 || colIdx >= len(chunk.columns) {
-			return nil, getError(errAPI, unprojectedColumnError(origColIdx))
-		}
+	colIdx, err := chunk.verifyAndRewriteColIdx(colIdx)
+	if err != nil {
+		return nil, getError(errAPI, err)
 	}
 
 	column := &chunk.columns[colIdx]
@@ -64,22 +54,14 @@ func (chunk *DataChunk) GetValue(colIdx, rowIdx int) (any, error) {
 
 // SetValue writes a single value to a column in a data chunk.
 // Note that this requires casting the type for each invocation.
+// If the column is not projected, the value is ignored.
 // NOTE: Custom ENUM types must be passed as string.
 func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
-	if chunk.projection == nil && (colIdx < 0 || colIdx >= len(chunk.columns)) {
-		return getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
-	}
-
-	if chunk.projection != nil && (colIdx < 0 || colIdx >= len(chunk.projection)) {
-		return getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
-	}
-
-	// Rewrite colIdx for projection
-	if chunk.projection != nil {
-		colIdx = chunk.projection[colIdx]
-		if colIdx < 0 || colIdx >= len(chunk.columns) {
-			return nil // Ignore unprojected columns
-		}
+	colIdx, err := chunk.verifyAndRewriteColIdx(colIdx)
+	if err != nil && errors.Is(err, ErrUnprojectedColumn) {
+		return nil
+	} else if err != nil {
+		return getError(errAPI, err)
 	}
 
 	column := &chunk.columns[colIdx]
@@ -89,25 +71,38 @@ func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 // SetChunkValue writes a single value to a column in a data chunk.
 // The difference with `chunk.SetValue` is that `SetChunkValue` does not
 // require casting the value to `any` (implicitly).
+// If the column is not projected, the value is ignored.
 // NOTE: Custom ENUM types must be passed as string.
 func SetChunkValue[T any](chunk DataChunk, colIdx, rowIdx int, val T) error {
-	if chunk.projection == nil && (colIdx < 0 || colIdx >= len(chunk.columns)) {
-		return getError(errAPI, columnCountError(colIdx, len(chunk.columns)))
-	}
-
-	if chunk.projection != nil && (colIdx < 0 || colIdx >= len(chunk.projection)) {
-		return getError(errAPI, columnCountError(colIdx, len(chunk.projection)))
-	}
-
-	// Rewrite colIdx for projection
-	if chunk.projection != nil {
-		colIdx = chunk.projection[colIdx]
-		if colIdx < 0 || colIdx >= len(chunk.columns) {
-			return nil // Ignore unprojected columns
-		}
+	colIdx, err := chunk.verifyAndRewriteColIdx(colIdx)
+	if err != nil && errors.Is(err, ErrUnprojectedColumn) {
+		return nil
+	} else if err != nil {
+		return getError(errAPI, err)
 	}
 
 	return setVectorVal(&chunk.columns[colIdx], mapping.IdxT(rowIdx), val)
+}
+
+// verifyColIdx checks whether the provided column index is valid.
+func (chunk *DataChunk) verifyAndRewriteColIdx(colIdx int) (int, error) {
+	if chunk.projection == nil && (colIdx < 0 || colIdx >= len(chunk.columns)) {
+		return colIdx, columnCountError(colIdx, len(chunk.columns))
+	}
+
+	if chunk.projection != nil && (colIdx < 0 || colIdx >= len(chunk.projection)) {
+		return colIdx, columnCountError(colIdx, len(chunk.projection))
+	}
+
+	if chunk.projection != nil {
+		origColIdx := colIdx
+		colIdx = chunk.projection[colIdx]
+		if !inBounds(chunk.columns, colIdx) {
+			return colIdx, UnprojectedColumnError(origColIdx)
+		}
+	}
+
+	return colIdx, nil
 }
 
 func (chunk *DataChunk) initFromTypes(types []mapping.LogicalType, writable bool) error {
