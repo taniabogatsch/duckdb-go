@@ -58,7 +58,7 @@ func (chunk *DataChunk) GetValue(colIdx, rowIdx int) (any, error) {
 // NOTE: Custom ENUM types must be passed as string.
 func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 	colIdx, err := chunk.verifyAndRewriteColIdx(colIdx)
-	if err != nil && errors.Is(err, ErrUnprojectedColumn) {
+	if err != nil && errors.Is(err, errUnprojectedColumn) {
 		return nil
 	} else if err != nil {
 		return getError(errAPI, err)
@@ -75,7 +75,7 @@ func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 // NOTE: Custom ENUM types must be passed as string.
 func SetChunkValue[T any](chunk DataChunk, colIdx, rowIdx int, val T) error {
 	colIdx, err := chunk.verifyAndRewriteColIdx(colIdx)
-	if err != nil && errors.Is(err, ErrUnprojectedColumn) {
+	if err != nil && errors.Is(err, errUnprojectedColumn) {
 		return nil
 	} else if err != nil {
 		return getError(errAPI, err)
@@ -98,7 +98,7 @@ func (chunk *DataChunk) verifyAndRewriteColIdx(colIdx int) (int, error) {
 		origColIdx := colIdx
 		colIdx = chunk.projection[colIdx]
 		if !inBounds(chunk.columns, colIdx) {
-			return colIdx, UnprojectedColumnError(origColIdx)
+			return colIdx, newUnprojectedColumnErr(origColIdx)
 		}
 	}
 
