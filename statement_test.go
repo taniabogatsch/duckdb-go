@@ -134,7 +134,7 @@ func TestPrepareQuery(t *testing.T) {
 		_, innerErr = stmt.ColumnName(0)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 
-		_, innerErr = stmt.ColumnType(0)
+		_, innerErr = stmt.ColumnTypeInfo(0)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 
 		innerErr = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}})
@@ -255,12 +255,11 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.ErrorContains(t, innerErr, paramIndexErrMsg)
 		require.Equal(t, TYPE_INVALID, paramType)
 
-		// Test column methods for UPDATE statement (should have no columns)
+		// Test column methods for UPDATE statement (should have a single Count column)
 		columnCount, innerErr := stmt.ColumnCount()
 		require.NoError(t, innerErr)
 		require.Equal(t, 1, columnCount)
 
-		// Test out of bounds access - should return empty/invalid for UPDATE with no columns
 		colName, innerErr := stmt.ColumnName(0)
 		require.NoError(t, innerErr)
 		require.Equal(t, "Count", colName)
@@ -268,6 +267,10 @@ func TestPrepareQueryPositional(t *testing.T) {
 		colType, innerErr := stmt.ColumnType(0)
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_BIGINT, colType)
+
+		colTypeInfo, innerErr := stmt.ColumnTypeInfo(0)
+		require.NoError(t, innerErr)
+		require.Equal(t, TYPE_BIGINT, colTypeInfo.InternalType())
 
 		r, innerErr := stmt.ExecBound(context.Background())
 		require.Nil(t, r)
@@ -1254,33 +1257,6 @@ func TestPreparedStatementColumnMethods(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-
-	// Test with closed statement
-	err = conn.Raw(func(driverConn any) error {
-		innerConn := driverConn.(*Conn)
-		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT * FROM test_columns`)
-		require.NoError(t, innerErr)
-		stmt := s.(*Stmt)
-
-		// Close the statement
-		require.NoError(t, stmt.Close())
-
-		// Test methods on closed statement
-		_, innerErr = stmt.ColumnCount()
-		require.ErrorIs(t, innerErr, errClosedStmt)
-
-		_, innerErr = stmt.ColumnName(0)
-		require.ErrorIs(t, innerErr, errClosedStmt)
-
-		_, innerErr = stmt.ColumnType(0)
-		require.ErrorIs(t, innerErr, errClosedStmt)
-
-		_, innerErr = stmt.ColumnTypeInfo(0)
-		require.ErrorIs(t, innerErr, errClosedStmt)
-
-		return nil
-	})
-	require.NoError(t, err)
 }
 
 func TestPreparedStatementColumnTypeInfo(t *testing.T) {
@@ -1554,33 +1530,6 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		colType, innerErr := stmt.ColumnType(0)
 		require.NoError(t, innerErr)
 		require.Equal(t, TYPE_INVALID, colType)
-
-		require.NoError(t, stmt.Close())
-		return nil
-	})
-	require.NoError(t, err)
-
-	// Test 4: Statement with no ambiguous types should work normally
-	err = conn.Raw(func(driverConn any) error {
-		innerConn := driverConn.(*Conn)
-
-		s, innerErr := innerConn.PrepareContext(context.Background(), `SELECT id, value FROM test_mixed`)
-		require.NoError(t, innerErr)
-		stmt := s.(*Stmt)
-
-		// Normal count when no ambiguous types
-		count, innerErr := stmt.ColumnCount()
-		require.NoError(t, innerErr)
-		require.Equal(t, 2, count)
-
-		// Column types are resolved
-		colType, innerErr := stmt.ColumnType(0)
-		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_INTEGER, colType)
-
-		colType, innerErr = stmt.ColumnType(1)
-		require.NoError(t, innerErr)
-		require.Equal(t, TYPE_VARCHAR, colType)
 
 		require.NoError(t, stmt.Close())
 		return nil

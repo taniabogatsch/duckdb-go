@@ -519,7 +519,7 @@ func (s *Stmt) ColumnTypeInfo(n int) (TypeInfo, error) {
 	lt := mapping.PreparedStatementColumnLogicalType(*s.preparedStmt, mapping.IdxT(n))
 	defer mapping.DestroyLogicalType(&lt)
 
-	return NewTypeInfoFromLogicalType(lt)
+	return newTypeInfoFromLogicalType(lt)
 }
 
 // ColumnName returns the name of the column at the given index (0-based).
@@ -536,10 +536,6 @@ func (s *Stmt) ColumnName(n int) (string, error) {
 	}
 
 	name := mapping.PreparedStatementColumnName(*s.preparedStmt, mapping.IdxT(n))
-	// C API returns nullptr for out-of-range indices
-	if name == "" {
-		return "", nil
-	}
 	return name, nil
 }
 

@@ -479,11 +479,11 @@ func (info *typeInfo) logicalUnionType() mapping.LogicalType {
 	return mapping.CreateUnionType(types, info.names)
 }
 
-// NewTypeInfoFromLogicalType converts a mapping.LogicalType to TypeInfo.
+// newTypeInfoFromLogicalType converts a mapping.LogicalType to TypeInfo.
 // This allows inspecting types returned from prepared statements.
 // The LogicalType must remain valid for the duration of this call.
 // The returned TypeInfo does not hold a reference to the LogicalType.
-func NewTypeInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
+func newTypeInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	t := mapping.GetTypeId(lt)
 
 	switch t {
@@ -531,7 +531,7 @@ func newListInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	childLT := mapping.ListTypeChildType(lt)
 	defer mapping.DestroyLogicalType(&childLT)
 
-	childInfo, err := NewTypeInfoFromLogicalType(childLT)
+	childInfo, err := newTypeInfoFromLogicalType(childLT)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +543,7 @@ func newArrayInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	childLT := mapping.ArrayTypeChildType(lt)
 	defer mapping.DestroyLogicalType(&childLT)
 
-	childInfo, err := NewTypeInfoFromLogicalType(childLT)
+	childInfo, err := newTypeInfoFromLogicalType(childLT)
 	if err != nil {
 		return nil, err
 	}
@@ -559,12 +559,12 @@ func newMapInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	valueLT := mapping.MapTypeValueType(lt)
 	defer mapping.DestroyLogicalType(&valueLT)
 
-	keyInfo, err := NewTypeInfoFromLogicalType(keyLT)
+	keyInfo, err := newTypeInfoFromLogicalType(keyLT)
 	if err != nil {
 		return nil, err
 	}
 
-	valueInfo, err := NewTypeInfoFromLogicalType(valueLT)
+	valueInfo, err := newTypeInfoFromLogicalType(valueLT)
 	if err != nil {
 		return nil, err
 	}
@@ -583,7 +583,7 @@ func newStructInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 		name := mapping.StructTypeChildName(lt, i)
 		childLT := mapping.StructTypeChildType(lt, i)
 
-		childInfo, err := NewTypeInfoFromLogicalType(childLT)
+		childInfo, err := newTypeInfoFromLogicalType(childLT)
 		mapping.DestroyLogicalType(&childLT)
 		if err != nil {
 			return nil, err
@@ -612,7 +612,7 @@ func newUnionInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 		memberNames[i] = mapping.UnionTypeMemberName(lt, i)
 		memberLT := mapping.UnionTypeMemberType(lt, i)
 
-		memberInfo, err := NewTypeInfoFromLogicalType(memberLT)
+		memberInfo, err := newTypeInfoFromLogicalType(memberLT)
 		mapping.DestroyLogicalType(&memberLT)
 		if err != nil {
 			return nil, err

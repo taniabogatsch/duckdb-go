@@ -347,7 +347,6 @@ func TestErrTypeInfo(t *testing.T) {
 }
 
 func TestNewTypeInfoFromLogicalType(t *testing.T) {
-	// Test primitive types
 	primitiveTests := []Type{
 		TYPE_BOOLEAN, TYPE_TINYINT, TYPE_SMALLINT, TYPE_INTEGER, TYPE_BIGINT,
 		TYPE_UTINYINT, TYPE_USMALLINT, TYPE_UINTEGER, TYPE_UBIGINT,
@@ -367,240 +366,232 @@ func TestNewTypeInfoFromLogicalType(t *testing.T) {
 			defer mapping.DestroyLogicalType(&lt)
 
 			// Convert back to TypeInfo
-			reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
+			reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
 			require.NoError(t, err)
 			require.Equal(t, primitiveType, reconstructedInfo.InternalType())
 		})
 	}
+}
 
-	// Test DECIMAL type
-	t.Run("DECIMAL", func(t *testing.T) {
-		originalInfo, err := NewDecimalInfo(10, 3)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeDecimal(t *testing.T) {
+	originalInfo, err := NewDecimalInfo(10, 3)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_DECIMAL, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_DECIMAL, reconstructedInfo.InternalType())
 
-		// Verify we can convert back and get the same logical type
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		require.Equal(t, uint8(10), mapping.DecimalWidth(reconstructedLT))
-		require.Equal(t, uint8(3), mapping.DecimalScale(reconstructedLT))
-	})
+	// Verify we can convert back and get the same logical type
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	require.Equal(t, uint8(10), mapping.DecimalWidth(reconstructedLT))
+	require.Equal(t, uint8(3), mapping.DecimalScale(reconstructedLT))
+}
 
-	// Test ENUM type
-	t.Run("ENUM", func(t *testing.T) {
-		originalInfo, err := NewEnumInfo("red", "green", "blue")
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeEnum(t *testing.T) {
+	originalInfo, err := NewEnumInfo("red", "green", "blue")
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_ENUM, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_ENUM, reconstructedInfo.InternalType())
 
-		// Verify enum values
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		require.Equal(t, uint32(3), mapping.EnumDictionarySize(reconstructedLT))
-		require.Equal(t, "red", mapping.EnumDictionaryValue(reconstructedLT, 0))
-		require.Equal(t, "green", mapping.EnumDictionaryValue(reconstructedLT, 1))
-		require.Equal(t, "blue", mapping.EnumDictionaryValue(reconstructedLT, 2))
-	})
+	// Verify enum values
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	require.Equal(t, uint32(3), mapping.EnumDictionarySize(reconstructedLT))
+	require.Equal(t, "red", mapping.EnumDictionaryValue(reconstructedLT, 0))
+	require.Equal(t, "green", mapping.EnumDictionaryValue(reconstructedLT, 1))
+	require.Equal(t, "blue", mapping.EnumDictionaryValue(reconstructedLT, 2))
+}
 
-	// Test LIST type
-	t.Run("LIST", func(t *testing.T) {
-		intInfo, err := NewTypeInfo(TYPE_INTEGER)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeList(t *testing.T) {
+	intInfo, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
 
-		originalInfo, err := NewListInfo(intInfo)
-		require.NoError(t, err)
+	originalInfo, err := NewListInfo(intInfo)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_LIST, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_LIST, reconstructedInfo.InternalType())
 
-		// Verify child type
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		childLT := mapping.ListTypeChildType(reconstructedLT)
-		defer mapping.DestroyLogicalType(&childLT)
-		require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(childLT))
-	})
+	// Verify child type
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	childLT := mapping.ListTypeChildType(reconstructedLT)
+	defer mapping.DestroyLogicalType(&childLT)
+	require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(childLT))
+}
 
-	// Test ARRAY type
-	t.Run("ARRAY", func(t *testing.T) {
-		varcharInfo, err := NewTypeInfo(TYPE_VARCHAR)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeArray(t *testing.T) {
+	varcharInfo, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
 
-		originalInfo, err := NewArrayInfo(varcharInfo, 5)
-		require.NoError(t, err)
+	originalInfo, err := NewArrayInfo(varcharInfo, 5)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_ARRAY, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_ARRAY, reconstructedInfo.InternalType())
 
-		// Verify child type and size
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		childLT := mapping.ArrayTypeChildType(reconstructedLT)
-		defer mapping.DestroyLogicalType(&childLT)
-		require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(childLT))
-		require.Equal(t, mapping.IdxT(5), mapping.ArrayTypeArraySize(reconstructedLT))
-	})
+	// Verify child type and size
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	childLT := mapping.ArrayTypeChildType(reconstructedLT)
+	defer mapping.DestroyLogicalType(&childLT)
+	require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(childLT))
+	require.Equal(t, mapping.IdxT(5), mapping.ArrayTypeArraySize(reconstructedLT))
+}
 
-	// Test MAP type
-	t.Run("MAP", func(t *testing.T) {
-		keyInfo, err := NewTypeInfo(TYPE_INTEGER)
-		require.NoError(t, err)
-		valueInfo, err := NewTypeInfo(TYPE_VARCHAR)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeMap(t *testing.T) {
+	keyInfo, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
+	valueInfo, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
 
-		originalInfo, err := NewMapInfo(keyInfo, valueInfo)
-		require.NoError(t, err)
+	originalInfo, err := NewMapInfo(keyInfo, valueInfo)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_MAP, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_MAP, reconstructedInfo.InternalType())
 
-		// Verify key and value types
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		keyLT := mapping.MapTypeKeyType(reconstructedLT)
-		defer mapping.DestroyLogicalType(&keyLT)
-		valueLT := mapping.MapTypeValueType(reconstructedLT)
-		defer mapping.DestroyLogicalType(&valueLT)
-		require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(keyLT))
-		require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(valueLT))
-	})
+	// Verify key and value types
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	keyLT := mapping.MapTypeKeyType(reconstructedLT)
+	defer mapping.DestroyLogicalType(&keyLT)
+	valueLT := mapping.MapTypeValueType(reconstructedLT)
+	defer mapping.DestroyLogicalType(&valueLT)
+	require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(keyLT))
+	require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(valueLT))
+}
 
-	// Test STRUCT type
-	t.Run("STRUCT", func(t *testing.T) {
-		intInfo, err := NewTypeInfo(TYPE_INTEGER)
-		require.NoError(t, err)
-		strInfo, err := NewTypeInfo(TYPE_VARCHAR)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeStruct(t *testing.T) {
+	intInfo, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
+	strInfo, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
 
-		entry1, err := NewStructEntry(intInfo, "id")
-		require.NoError(t, err)
-		entry2, err := NewStructEntry(strInfo, "name")
-		require.NoError(t, err)
+	entry1, err := NewStructEntry(intInfo, "id")
+	require.NoError(t, err)
+	entry2, err := NewStructEntry(strInfo, "name")
+	require.NoError(t, err)
 
-		originalInfo, err := NewStructInfo(entry1, entry2)
-		require.NoError(t, err)
+	originalInfo, err := NewStructInfo(entry1, entry2)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_STRUCT, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_STRUCT, reconstructedInfo.InternalType())
 
-		// Verify struct fields
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		require.Equal(t, mapping.IdxT(2), mapping.StructTypeChildCount(reconstructedLT))
-		require.Equal(t, "id", mapping.StructTypeChildName(reconstructedLT, 0))
-		require.Equal(t, "name", mapping.StructTypeChildName(reconstructedLT, 1))
+	// Verify struct fields
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	require.Equal(t, mapping.IdxT(2), mapping.StructTypeChildCount(reconstructedLT))
+	require.Equal(t, "id", mapping.StructTypeChildName(reconstructedLT, 0))
+	require.Equal(t, "name", mapping.StructTypeChildName(reconstructedLT, 1))
 
-		child0LT := mapping.StructTypeChildType(reconstructedLT, 0)
-		defer mapping.DestroyLogicalType(&child0LT)
-		require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(child0LT))
+	child0LT := mapping.StructTypeChildType(reconstructedLT, 0)
+	defer mapping.DestroyLogicalType(&child0LT)
+	require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(child0LT))
 
-		child1LT := mapping.StructTypeChildType(reconstructedLT, 1)
-		defer mapping.DestroyLogicalType(&child1LT)
-		require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(child1LT))
-	})
+	child1LT := mapping.StructTypeChildType(reconstructedLT, 1)
+	defer mapping.DestroyLogicalType(&child1LT)
+	require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(child1LT))
+}
 
-	// Test UNION type
-	t.Run("UNION", func(t *testing.T) {
-		intInfo, err := NewTypeInfo(TYPE_INTEGER)
-		require.NoError(t, err)
-		strInfo, err := NewTypeInfo(TYPE_VARCHAR)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeUnion(t *testing.T) {
+	intInfo, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
+	strInfo, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
 
-		originalInfo, err := NewUnionInfo(
-			[]TypeInfo{intInfo, strInfo},
-			[]string{"num", "text"},
-		)
-		require.NoError(t, err)
+	originalInfo, err := NewUnionInfo(
+		[]TypeInfo{intInfo, strInfo},
+		[]string{"num", "text"},
+	)
+	require.NoError(t, err)
 
-		lt := originalInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := originalInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_UNION, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_UNION, reconstructedInfo.InternalType())
 
-		// Verify union members
-		reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
-		defer mapping.DestroyLogicalType(&reconstructedLT)
-		require.Equal(t, mapping.IdxT(2), mapping.UnionTypeMemberCount(reconstructedLT))
-		require.Equal(t, "num", mapping.UnionTypeMemberName(reconstructedLT, 0))
-		require.Equal(t, "text", mapping.UnionTypeMemberName(reconstructedLT, 1))
+	// Verify union members
+	reconstructedLT := reconstructedInfo.(*typeInfo).logicalType()
+	defer mapping.DestroyLogicalType(&reconstructedLT)
+	require.Equal(t, mapping.IdxT(2), mapping.UnionTypeMemberCount(reconstructedLT))
+	require.Equal(t, "num", mapping.UnionTypeMemberName(reconstructedLT, 0))
+	require.Equal(t, "text", mapping.UnionTypeMemberName(reconstructedLT, 1))
 
-		member0LT := mapping.UnionTypeMemberType(reconstructedLT, 0)
-		defer mapping.DestroyLogicalType(&member0LT)
-		require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(member0LT))
+	member0LT := mapping.UnionTypeMemberType(reconstructedLT, 0)
+	defer mapping.DestroyLogicalType(&member0LT)
+	require.Equal(t, TYPE_INTEGER, mapping.GetTypeId(member0LT))
 
-		member1LT := mapping.UnionTypeMemberType(reconstructedLT, 1)
-		defer mapping.DestroyLogicalType(&member1LT)
-		require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(member1LT))
-	})
+	member1LT := mapping.UnionTypeMemberType(reconstructedLT, 1)
+	defer mapping.DestroyLogicalType(&member1LT)
+	require.Equal(t, TYPE_VARCHAR, mapping.GetTypeId(member1LT))
+}
 
-	// Test nested complex types
-	t.Run("NestedTypes", func(t *testing.T) {
-		// Create LIST of STRUCTs
-		intInfo, err := NewTypeInfo(TYPE_INTEGER)
-		require.NoError(t, err)
-		strInfo, err := NewTypeInfo(TYPE_VARCHAR)
-		require.NoError(t, err)
+func TestNewTypeInfoFromLogicalTypeNested(t *testing.T) {
+	// Create LIST of STRUCTs
+	intInfo, err := NewTypeInfo(TYPE_INTEGER)
+	require.NoError(t, err)
+	strInfo, err := NewTypeInfo(TYPE_VARCHAR)
+	require.NoError(t, err)
 
-		entry1, err := NewStructEntry(intInfo, "id")
-		require.NoError(t, err)
-		entry2, err := NewStructEntry(strInfo, "name")
-		require.NoError(t, err)
+	entry1, err := NewStructEntry(intInfo, "id")
+	require.NoError(t, err)
+	entry2, err := NewStructEntry(strInfo, "name")
+	require.NoError(t, err)
 
-		structInfo, err := NewStructInfo(entry1, entry2)
-		require.NoError(t, err)
+	structInfo, err := NewStructInfo(entry1, entry2)
+	require.NoError(t, err)
 
-		listInfo, err := NewListInfo(structInfo)
-		require.NoError(t, err)
+	listInfo, err := NewListInfo(structInfo)
+	require.NoError(t, err)
 
-		lt := listInfo.logicalType()
-		defer mapping.DestroyLogicalType(&lt)
+	lt := listInfo.logicalType()
+	defer mapping.DestroyLogicalType(&lt)
 
-		reconstructedInfo, err := NewTypeInfoFromLogicalType(lt)
-		require.NoError(t, err)
-		require.Equal(t, TYPE_LIST, reconstructedInfo.InternalType())
+	reconstructedInfo, err := newTypeInfoFromLogicalType(lt)
+	require.NoError(t, err)
+	require.Equal(t, TYPE_LIST, reconstructedInfo.InternalType())
 
-		details := reconstructedInfo.Details()
-		listDetails, ok := details.(*ListDetails)
-		require.True(t, ok)
-		require.Equal(t, TYPE_STRUCT, listDetails.Child.InternalType())
+	details := reconstructedInfo.Details()
+	listDetails, ok := details.(*ListDetails)
+	require.True(t, ok)
+	require.Equal(t, TYPE_STRUCT, listDetails.Child.InternalType())
 
-		structDetails, ok := listDetails.Child.Details().(*StructDetails)
-		require.True(t, ok)
-		require.Len(t, structDetails.Entries, 2)
-		require.Equal(t, TYPE_INTEGER, structDetails.Entries[0].Info().InternalType())
-		require.Equal(t, "id", structDetails.Entries[0].Name())
-		require.Equal(t, TYPE_VARCHAR, structDetails.Entries[1].Info().InternalType())
-		require.Equal(t, "name", structDetails.Entries[1].Name())
-	})
+	structDetails, ok := listDetails.Child.Details().(*StructDetails)
+	require.True(t, ok)
+	require.Len(t, structDetails.Entries, 2)
+	require.Equal(t, TYPE_INTEGER, structDetails.Entries[0].Info().InternalType())
+	require.Equal(t, "id", structDetails.Entries[0].Name())
+	require.Equal(t, TYPE_VARCHAR, structDetails.Entries[1].Info().InternalType())
+	require.Equal(t, "name", structDetails.Entries[1].Name())
 }
 
 func TestTypeInfoDetails(t *testing.T) {
@@ -617,7 +608,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		}
 	})
 
-	// Test DECIMAL details
 	t.Run("DecimalDetails", func(t *testing.T) {
 		info, err := NewDecimalInfo(10, 3)
 		require.NoError(t, err)
@@ -631,7 +621,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, uint8(3), decimalDetails.Scale)
 	})
 
-	// Test ENUM details
 	t.Run("EnumDetails", func(t *testing.T) {
 		info, err := NewEnumInfo("red", "green", "blue")
 		require.NoError(t, err)
@@ -651,7 +640,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, "red", enumDetails2.Values[0])
 	})
 
-	// Test LIST details
 	t.Run("ListDetails", func(t *testing.T) {
 		intInfo, err := NewTypeInfo(TYPE_INTEGER)
 		require.NoError(t, err)
@@ -667,7 +655,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, TYPE_INTEGER, listDetails.Child.InternalType())
 	})
 
-	// Test ARRAY details
 	t.Run("ArrayDetails", func(t *testing.T) {
 		varcharInfo, err := NewTypeInfo(TYPE_VARCHAR)
 		require.NoError(t, err)
@@ -703,7 +690,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, TYPE_VARCHAR, mapDetails.Value.InternalType())
 	})
 
-	// Test STRUCT details
 	t.Run("StructDetails", func(t *testing.T) {
 		intInfo, err := NewTypeInfo(TYPE_INTEGER)
 		require.NoError(t, err)
@@ -730,7 +716,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, TYPE_VARCHAR, structDetails.Entries[1].Info().InternalType())
 	})
 
-	// Test UNION details
 	t.Run("UnionDetails", func(t *testing.T) {
 		intInfo, err := NewTypeInfo(TYPE_INTEGER)
 		require.NoError(t, err)
@@ -764,7 +749,6 @@ func TestTypeInfoDetails(t *testing.T) {
 		require.Equal(t, "num", unionDetails2.Members[0].Name)
 	})
 
-	// Test nested type details
 	t.Run("NestedTypeDetails", func(t *testing.T) {
 		// Create a LIST of STRUCTs
 		intInfo, err := NewTypeInfo(TYPE_INTEGER)
