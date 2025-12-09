@@ -86,7 +86,7 @@ const (
 	interfaceIsNilErrMsg    = "interface is nil"
 	duplicateNameErrMsg     = "duplicate name"
 	paramIndexErrMsg        = "invalid parameter index"
-	columnIndexErrMsg      = "invalid column index"
+	columnIndexErrMsg       = "invalid column index"
 )
 
 var (
