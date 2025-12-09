@@ -3,6 +3,10 @@
 # Helper script to build a Go program against a locally built DuckDB (debug),
 # with symbols and proper rpath so you can debug into DuckDB C/C++ sources.
 #
+# Disclaimer:
+# - This script is intended for development and debugging purposes only.
+# - We don't guarantee on maintaining this script in future releases.
+#
 # Why this script?
 # - CGO relies on environment variables (CGO_CFLAGS/CGO_LDFLAGS). If they are not
 #   exported to the environment, "go build" will not see them, leading to

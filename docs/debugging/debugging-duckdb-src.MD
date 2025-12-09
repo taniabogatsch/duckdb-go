@@ -1,7 +1,7 @@
 ### Building a Go program against a local DuckDB (for debugging)
 
-If you want to debug into DuckDB's C++ sources from a Go application that uses `duckdb-go`, you need to link your Go
-binary against the locally built DuckDB debug library and ensure the correct rpath is set so the dynamic loader can find it.
+To debug into DuckDB's C++ sources from a Go application that uses `duckdb-go`, you need to link your Go binary against the locally built
+DuckDB debug lubrary. You also need to set the correct rpath so that the dynamic loader can find the S++ sources.
 
 A helper script is provided:
 ```
@@ -10,10 +10,10 @@ scripts/go-build-duckdb-debug.sh /absolute/path/to/your/go/app [package_or_dir] 
 
 Example:
 ```
-# From the DuckDB repo root, after building Debug:
+# Build a debug build from the DuckDB repo root:
 make debug
 
-# Build the Go sample, with symbols, linking to this repo's debug libduckdb
+# Build the Go application, linking to this DuckDB repo's debug library (`libduckdb`)
 scripts/go-build-duckdb-debug.sh ~/Development/example-duckdb-go-project ./examples/simple simple_debug
 ```
 The script will export `CGO_CFLAGS` and `CGO_LDFLAGS` appropriately (including `-Wl,-rpath,...`) and invoke `go build -tags duckdb_use_lib -gcflags "all=-N -l"` so you can step through DuckDB code in a debugger.
@@ -41,7 +41,7 @@ If the loader cannot find `libduckdb` at runtime, set `DYLD_LIBRARY_PATH` (macOS
   </configuration>
 </component>
 ```
-2. Replace the script path of `go-build-duckdb-debug.sh` with the path to your local copy of the script.`
+2. Replace the script path of `go-build-duckdb-debug.sh` with the path to your local copy of the script.
 3. Import the `go-debug` configuration, and again, replace `./../example-duckdb-go-project` with your own Go project path.
 ```xml
 <component name="ProjectRunConfigurationManager">
