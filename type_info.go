@@ -579,9 +579,9 @@ func newStructInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	}
 
 	entries := make([]StructEntry, count)
-	for i := mapping.IdxT(0); i < count; i++ {
-		name := mapping.StructTypeChildName(lt, i)
-		childLT := mapping.StructTypeChildType(lt, i)
+	for i := range int(count) {
+		name := mapping.StructTypeChildName(lt, mapping.IdxT(i))
+		childLT := mapping.StructTypeChildType(lt, mapping.IdxT(i))
 
 		childInfo, err := newTypeInfoFromLogicalType(childLT)
 		mapping.DestroyLogicalType(&childLT)
@@ -608,9 +608,9 @@ func newUnionInfoFromLogicalType(lt mapping.LogicalType) (TypeInfo, error) {
 	memberTypes := make([]TypeInfo, count)
 	memberNames := make([]string, count)
 
-	for i := mapping.IdxT(0); i < count; i++ {
-		memberNames[i] = mapping.UnionTypeMemberName(lt, i)
-		memberLT := mapping.UnionTypeMemberType(lt, i)
+	for i := range int(count) {
+		memberNames[i] = mapping.UnionTypeMemberName(lt, mapping.IdxT(i))
+		memberLT := mapping.UnionTypeMemberType(lt, mapping.IdxT(i))
 
 		memberInfo, err := newTypeInfoFromLogicalType(memberLT)
 		mapping.DestroyLogicalType(&memberLT)
