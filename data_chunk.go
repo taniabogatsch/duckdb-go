@@ -85,6 +85,10 @@ func SetChunkValue[T any](chunk DataChunk, colIdx, rowIdx int, val T) error {
 	return setVectorVal(&chunk.columns[colIdx], mapping.IdxT(rowIdx), val)
 }
 
+func inBounds[T any](s []T, idx int) bool {
+	return idx >= 0 && idx < len(s)
+}
+
 // verifyColIdx checks whether the provided column index is valid.
 func (chunk *DataChunk) verifyAndRewriteColIdx(colIdx int) (int, error) {
 	if chunk.projection == nil && (colIdx < 0 || colIdx >= len(chunk.columns)) {
