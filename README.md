@@ -408,7 +408,7 @@ Additionally, automatic extension loading is enabled.
 1. Create a new branch.
 2. Update the `mapping` and `arrowmapping` dependencies in `mod.go`.
 3. Run `go mod tidy`.
-4. Update `VERSION=` in `tests.yaml`.
+4. Update `DUCKDB_VERSION` in `Makefile`.
 5. Update the latest version in `README.md`.
 6. Commit and PR changes.
 7. Push a new tagged release, `vx.x.x`.
