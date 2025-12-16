@@ -69,6 +69,7 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func()
 		return err
 	}
 
+	bgDoneCh := make(chan struct{})
 	done := make(chan struct{})
 
 	// Interrupter goroutine
@@ -77,6 +78,7 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func()
 		case <-ctx.Done():
 		case <-done:
 			// finished before cancellation
+			close(bgDoneCh)
 			return
 		}
 
@@ -84,6 +86,7 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func()
 		for {
 			select {
 			case <-done:
+				close(bgDoneCh)
 				return
 			default:
 				mapping.Interrupt(conn)
@@ -95,5 +98,11 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func()
 	err := fn()
 
 	close(done)
+
+	// Wait for interrupter goroutine to finish
+	// Sometimes the go-routine is not scheduled immediately.
+	// By the time it is scheduled, another query might be running on this connection.
+	// If we don't wait for the go-routine to finish, it can cancel that new query.
+	<-bgDoneCh
 	return err
 }
