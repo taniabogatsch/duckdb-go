@@ -100,7 +100,7 @@ func TestPrepareQuery(t *testing.T) {
 		require.Nil(t, r)
 		require.ErrorIs(t, innerErr, errNotBound)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Ordinal: 1, Value: 0}})
 		require.NoError(t, innerErr)
 
 		// Don't immediately close the rows to trigger an active rows error.
@@ -137,7 +137,7 @@ func TestPrepareQuery(t *testing.T) {
 		_, innerErr = stmt.ColumnTypeInfo(0)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Ordinal: 1, Value: 0}})
 		require.ErrorIs(t, innerErr, errCouldNotBind)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 		return nil
@@ -276,7 +276,7 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.Nil(t, r)
 		require.ErrorIs(t, innerErr, errNotBound)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}, {Ordinal: 2, Value: "hello"}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Ordinal: 1, Value: 0}, {Ordinal: 2, Value: "hello"}})
 		require.NoError(t, innerErr)
 
 		r, innerErr = stmt.ExecBound(context.Background())
@@ -297,7 +297,7 @@ func TestPrepareQueryPositional(t *testing.T) {
 		require.ErrorIs(t, innerErr, errClosedStmt)
 		require.Equal(t, TYPE_INVALID, paramType)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}, {Ordinal: 2, Value: "hello"}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Ordinal: 1, Value: 0}, {Ordinal: 2, Value: "hello"}})
 		require.ErrorIs(t, innerErr, errCouldNotBind)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 		return nil
@@ -383,7 +383,7 @@ func TestPrepareQueryNamed(t *testing.T) {
 		require.Nil(t, r)
 		require.ErrorIs(t, innerErr, errNotBound)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Name: "bar", Value: "hello"}, {Name: "baz", Value: 0}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Name: "bar", Value: "hello"}, {Name: "baz", Value: 0}})
 		require.NoError(t, innerErr)
 
 		r, innerErr = stmt.ExecBound(context.Background())
@@ -404,7 +404,7 @@ func TestPrepareQueryNamed(t *testing.T) {
 		require.ErrorIs(t, innerErr, errClosedStmt)
 		require.Equal(t, TYPE_INVALID, paramType)
 
-		innerErr = stmt.Bind([]driver.NamedValue{{Name: "bar", Value: "hello"}, {Name: "baz", Value: 0}})
+		innerErr = stmt.Bind(context.Background(), []driver.NamedValue{{Name: "bar", Value: "hello"}, {Name: "baz", Value: 0}})
 		require.ErrorIs(t, innerErr, errCouldNotBind)
 		require.ErrorIs(t, innerErr, errClosedStmt)
 		return nil
@@ -427,7 +427,7 @@ func TestUninitializedStmt(t *testing.T) {
 	require.ErrorIs(t, err, errUninitializedStmt)
 	require.Empty(t, paramName)
 
-	err = stmt.Bind([]driver.NamedValue{{Ordinal: 1, Value: 0}})
+	err = stmt.Bind(context.Background(), []driver.NamedValue{{Ordinal: 1, Value: 0}})
 	require.ErrorIs(t, err, errCouldNotBind)
 	require.ErrorIs(t, err, errUninitializedStmt)
 

@@ -117,7 +117,8 @@ func (conn *Conn) Prepare(query string) (driver.Stmt, error) {
 		return nil, errors.Join(errPrepare, errClosedCon)
 	}
 
-	stmts, count, err := conn.extractStmts(query)
+	// Prepare without external context: use Background for interruption scoping.
+	stmts, count, err := conn.extractStmts(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func (conn *Conn) Prepare(query string) (driver.Stmt, error) {
 		return nil, errors.Join(errPrepare, errMissingPrepareContext)
 	}
 
-	return conn.prepareExtractedStmt(*stmts, 0)
+	return conn.prepareExtractedStmt(context.Background(), *stmts, 0)
 }
 
 // Begin is deprecated: Use BeginTx instead.
@@ -171,31 +172,49 @@ func (conn *Conn) Close() error {
 	return nil
 }
 
-func (conn *Conn) extractStmts(query string) (*mapping.ExtractedStatements, mapping.IdxT, error) {
-	var stmts mapping.ExtractedStatements
+func (conn *Conn) extractStmts(ctx context.Context, query string) (*mapping.ExtractedStatements, mapping.IdxT, error) {
+	var (
+		stmts   mapping.ExtractedStatements
+		count   mapping.IdxT
+		callErr error
+	)
 
-	count := mapping.ExtractStatements(conn.conn, query, &stmts)
-	if count == 0 {
-		errMsg := mapping.ExtractStatementsError(stmts)
-		mapping.DestroyExtracted(&stmts)
-		if errMsg != "" {
-			return nil, 0, getDuckDBError(errMsg)
+	callErr = runWithCtxInterrupt(ctx, conn.conn, func() error {
+		count = mapping.ExtractStatements(conn.conn, query, &stmts)
+		if count == 0 {
+			errMsg := mapping.ExtractStatementsError(stmts)
+			mapping.DestroyExtracted(&stmts)
+			if errMsg != "" {
+				return getDuckDBError(errMsg)
+			}
+			return errEmptyQuery
 		}
-		return nil, 0, errEmptyQuery
+		return nil
+	})
+	if callErr != nil {
+		return nil, 0, callErr
 	}
 
 	return &stmts, count, nil
 }
 
-func (conn *Conn) prepareExtractedStmt(extractedStmts mapping.ExtractedStatements, i mapping.IdxT) (*Stmt, error) {
-	var stmt mapping.PreparedStatement
-	state := mapping.PrepareExtractedStatement(conn.conn, extractedStmts, i, &stmt)
-	if state == mapping.StateError {
-		err := getDuckDBError(mapping.PrepareError(stmt))
-		mapping.DestroyPrepare(&stmt)
-		return nil, err
+func (conn *Conn) prepareExtractedStmt(ctx context.Context, extractedStmts mapping.ExtractedStatements, i mapping.IdxT) (*Stmt, error) {
+	var (
+		stmt    mapping.PreparedStatement
+		prepErr error
+	)
+	prepErr = runWithCtxInterrupt(ctx, conn.conn, func() error {
+		state := mapping.PrepareExtractedStatement(conn.conn, extractedStmts, i, &stmt)
+		if state == mapping.StateError {
+			err := getDuckDBError(mapping.PrepareError(stmt))
+			mapping.DestroyPrepare(&stmt)
+			return err
+		}
+		return nil
+	})
+	if prepErr != nil {
+		return nil, prepErr
 	}
-
 	return &Stmt{conn: conn, preparedStmt: &stmt}, nil
 }
 
@@ -204,15 +223,21 @@ func (conn *Conn) prepareStmts(ctx context.Context, query string) (*Stmt, error)
 		return nil, errClosedCon
 	}
 
-	stmts, count, errExtract := conn.extractStmts(query)
+	stmts, count, errExtract := conn.extractStmts(ctx, query)
 	if errExtract != nil {
 		return nil, errExtract
 	}
 	defer mapping.DestroyExtracted(stmts)
 
 	for i := mapping.IdxT(0); i < count-1; i++ {
-		preparedStmt, err := conn.prepareExtractedStmt(*stmts, i)
+		preparedStmt, err := conn.prepareExtractedStmt(ctx, *stmts, i)
 		if err != nil {
+			return nil, err
+		}
+
+		// Check for cancellation between prepare and execute; ensure cleanup.
+		if err := ctx.Err(); err != nil {
+			_ = preparedStmt.Close()
 			return nil, err
 		}
 
@@ -227,7 +252,7 @@ func (conn *Conn) prepareStmts(ctx context.Context, query string) (*Stmt, error)
 		}
 	}
 
-	return conn.prepareExtractedStmt(*stmts, count-1)
+	return conn.prepareExtractedStmt(ctx, *stmts, count-1)
 }
 
 // GetTableNames returns the tables names of a query.
@@ -240,7 +265,7 @@ func GetTableNames(c *sql.Conn, query string, qualified bool) ([]string, error) 
 		conn := driverConn.(*Conn)
 
 		// Validate query syntax first
-		stmts, _, errExtract := conn.extractStmts(query)
+		stmts, _, errExtract := conn.extractStmts(context.Background(), query)
 		if errExtract != nil {
 			return errExtract
 		}
