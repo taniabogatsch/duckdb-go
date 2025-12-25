@@ -47,8 +47,9 @@ func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Append
 
 // NewAppenderWithColumns returns a new Appender that is restricted to a subset of columns.
 // This enables more efficient appends by narrowing the appender scope to only the provided columns.
-// The Appender batches rows via AppendRow; each row must provide values for exactly the selected columns.
-// Columns not selected will be filled with their DEFAULT values (or NULL) by DuckDB.
+// The Appender batches rows via AppendRow.
+// Each row must provide values for exactly the selected columns.
+// DuckDB will fill columns not selected with their DEFAULT values (or NULL).
 // Note: Changing the active column set causes a flush in DuckDB. Therefore, we cannot change them later during the
 // lifetime of the Appender.
 func NewAppenderWithColumns(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
