@@ -35,6 +35,10 @@ func columnCountError(actual, expected int) error {
 	return fmt.Errorf("%s: expected %d, got %d", columnCountErrMsg, expected, actual)
 }
 
+func setValueError(colIdx, rowIdx int, val any, err error) error {
+	return fmt.Errorf("%s: at row %d, col %d, val: %v: %w", setValueErrMsg, rowIdx, colIdx, val, err)
+}
+
 func paramIndexError(idx int, max uint64) error {
 	return fmt.Errorf("%s: %d is out of range [1, %d]", paramIndexErrMsg, idx, max)
 }
@@ -77,6 +81,7 @@ const (
 	invalidInputErrMsg      = "invalid input"
 	structFieldErrMsg       = "invalid STRUCT field"
 	columnCountErrMsg       = "invalid column count"
+	setValueErrMsg          = "failed to set value"
 	unprojectedColumnErrMsg = "unprojected column"
 	unsupportedTypeErrMsg   = "unsupported data type"
 	invalidatedAppenderMsg  = "appended and not yet flushed data has been invalidated due to error"
