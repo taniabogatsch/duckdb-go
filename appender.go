@@ -42,6 +42,22 @@ func NewAppenderFromConn(driverConn driver.Conn, schema, table string) (*Appende
 // `driverConn` is the raw sql.Conn's driver connection.
 // `catalog`, `schema` and `table` specify the table (`catalog.schema.table`) to append to.
 func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Appender, error) {
+	return newTableAppender(driverConn, catalog, schema, table, nil)
+}
+
+// NewAppenderWithColumns returns a new Appender that is restricted to a subset of columns.
+// This enables more efficient appends by narrowing the appender scope to only the provided columns.
+// The Appender batches rows via AppendRow; each row must provide values for exactly the selected columns.
+// Columns not selected will be filled with their DEFAULT values (or NULL) by DuckDB.
+// Note: Changing the active column set causes a flush in DuckDB. Therefore, we cannot change them later during the
+// lifetime of the Appender.
+func NewAppenderWithColumns(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
+	return newTableAppender(driverConn, catalog, schema, table, columns)
+}
+
+// newTableAppender consolidates the common logic of creating an appender, optionally narrowing
+// it to a subset of columns before fetching types. NewAppender and NewAppenderWithColumns delegate this helper
+func newTableAppender(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
 	var a Appender
 	err := a.appenderConn(driverConn)
 	if err != nil {
@@ -53,6 +69,19 @@ func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Append
 		err = errorDataError(mapping.AppenderErrorData(a.appender))
 		mapping.AppenderDestroy(&a.appender)
 		return nil, getError(errAppenderCreation, err)
+	}
+
+	// If a subset of columns is provided, activate only those columns on the appender
+	// BEFORE fetching types, so the type enumeration reflects only the active columns.
+	// (In DuckDB, if columns are not added, BaseAppender::GetActiveTypes() will return all table columns)
+	if len(columns) > 0 {
+		for _, col := range columns {
+			if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
+				derr := getDuckDBError(mapping.AppenderError(a.appender))
+				mapping.AppenderDestroy(&a.appender)
+				return nil, getError(errAppenderCreation, derr)
+			}
+		}
 	}
 
 	// Get the column types.
