@@ -77,9 +77,9 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 	if len(columns) > 0 {
 		for _, col := range columns {
 			if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
-				derr := getDuckDBError(mapping.AppenderError(a.appender))
+				duckError := getDuckDBError(mapping.AppenderError(a.appender))
 				mapping.AppenderDestroy(&a.appender)
-				return nil, getError(errAppenderCreation, derr)
+				return nil, getError(errAppenderCreation, duckError)
 			}
 		}
 	}
