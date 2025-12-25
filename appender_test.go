@@ -1145,20 +1145,20 @@ func TestAppenderWithColumnsBasic(t *testing.T) {
 	require.Len(t, got, 3)
 
 	// Row with id=123, col_b="hello"
-	require.True(t, got[0].id.Int64 == 123)
-	require.True(t, got[0].b.String == "hello")
+	require.Equal(t, 123, got[0].id.Int64)
+	require.Equal(t, "hello", got[0].b.String)
 	require.False(t, got[0].a.Valid)
 	require.False(t, got[0].c.Valid)
 
 	// Row with id=456, col_b=NULL
-	require.True(t, got[1].id.Int64 == 456)
+	require.Equal(t, 456, got[1].id.Int64)
 	require.False(t, got[1].b.Valid)
 	require.False(t, got[1].a.Valid)
 	require.False(t, got[1].c.Valid)
 
 	// Row with id=NULL, col_b="only-b"
 	require.False(t, got[2].id.Valid)
-	require.True(t, got[2].b.String == "only-b")
+	require.Equal(t, "only-b", got[2].b.String)
 	require.False(t, got[2].a.Valid)
 	require.False(t, got[2].c.Valid)
 }
