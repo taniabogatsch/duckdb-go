@@ -62,6 +62,8 @@ func (s *contextStore) delete(connId uint64) {
 //     duckdb_interrupt(conn) until fn returns, for cases when the interruptions are cleared internally in DuckDB.
 //   - The interrupt loop is strictly scoped to the lifetime of this call and
 //     stops immediately when fn returns, to avoid goroutine leaks.
+//   - This function is a bit "dangerous" as we're spawning a go-routine from within,
+//     so we will need to be mindful of this when we're using it
 //   - We never call interrupt unless ctx is canceled.
 func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func() error) error {
 	// Short circuit: do not start the DuckDB call if context is already canceled.
