@@ -20,6 +20,10 @@ func newContextStore() *contextStore {
 	}
 }
 
+// onInterrupterStart is an optional test hook called when an interrupter
+// goroutine is started. It is intended to be set only from tests.
+var onInterrupterStart func()
+
 func (s *contextStore) load(connId uint64) context.Context {
 	v, ok := s.m.Load(connId)
 	if !ok {
@@ -57,25 +61,45 @@ func (s *contextStore) delete(connId uint64) {
 // mapping.Interrupt on the given connection while the call is in flight.
 //
 // Semantics:
+//
 //   - Short-circuit - if ctx is already canceled, the call is not started and ctx.Err() is returned.
+//
 //   - While fn is executing, and after ctx is canceled, we repeatedly invoke
 //     duckdb_interrupt(conn) until fn returns, for cases when the interruptions are cleared internally in DuckDB.
+//
 //   - The interrupt loop is strictly scoped to the lifetime of this call and
 //     stops immediately when fn returns, to avoid goroutine leaks.
+//
 //   - This function is a bit "dangerous" as we're spawning a go-routine from within,
 //     so we will need to be mindful of this when we're using it
+//
 //   - We never call interrupt unless ctx is canceled.
-func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func() error) error {
+//
+//   - The callback fn receives a derived context that carries an internal marker.
+//     Any nested calls of runWithCtxInterrupt must pass that context forward
+//     so the marker can suppress additional interrupter goroutines.
+func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func(context.Context) error) error {
 	// Short circuit: do not start the DuckDB call if context is already canceled.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
+	// guard: if an interrupter is already active for this call, don’t spawn another.
+	// We tag the context to indicate an active interrupter scope.
+	type interruptActiveKey struct{}
+	if ctx.Value(interruptActiveKey{}) != nil {
+		return fn(ctx)
+	}
+	ctx = context.WithValue(ctx, interruptActiveKey{}, struct{}{})
 
 	bgDoneCh := make(chan struct{})
 	done := make(chan struct{})
 
 	// Interrupter goroutine
 	go func() {
+		if onInterrupterStart != nil {
+			onInterrupterStart()
+		}
 		select {
 		case <-ctx.Done():
 		case <-done:
@@ -97,7 +121,8 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func()
 		}
 	}()
 
-	err := fn()
+	// We pass `ctx` to keep that "enriched" context with the mark that we've already spawned a go-routine
+	err := fn(ctx)
 
 	close(done)
 

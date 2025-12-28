@@ -82,23 +82,30 @@ func (conn *Conn) QueryContext(ctx context.Context, query string, args []driver.
 	cleanupCtx := conn.setContext(ctx)
 	defer cleanupCtx()
 
-	prepared, err := conn.prepareStmts(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-
-	r, err := prepared.QueryContext(ctx, args)
-	if err != nil {
-		errClose := prepared.Close()
-		if errClose != nil {
-			return nil, errors.Join(err, errClose)
+	var rows driver.Rows
+	err := runWithCtxInterrupt(ctx, conn.conn, func(wctx context.Context) error {
+		prepared, err := conn.prepareStmts(wctx, query)
+		if err != nil {
+			return err
 		}
+
+		r, err := prepared.QueryContext(wctx, args)
+		if err != nil {
+			errClose := prepared.Close()
+			if errClose != nil {
+				return errors.Join(err, errClose)
+			}
+			return err
+		}
+		// We must close the prepared statement after closing the rows r.
+		prepared.closeOnRowsClose = true
+		rows = r
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	// We must close the prepared statement after closing the rows r.
-	prepared.closeOnRowsClose = true
-
-	return r, nil
+	return rows, nil
 }
 
 // PrepareContext returns a prepared statement, bound to this connection.
@@ -276,7 +283,7 @@ func GetTableNames(c *sql.Conn, query string, qualified bool) ([]string, error) 
 	}
 
 	var tableNames []string
-	for i := range mapping.GetListSize(v) {
+	for i := mapping.IdxT(0); i < mapping.GetListSize(v); i++ {
 		func() {
 			child := mapping.GetListChild(v, i)
 			defer mapping.DestroyValue(&child)

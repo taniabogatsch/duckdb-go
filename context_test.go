@@ -27,7 +27,7 @@ func TestRunWithCtxInterrupt_PreCanceled(t *testing.T) {
 
 	called := false
 	var dummyConn mapping.Connection
-	err := runWithCtxInterrupt(ctx, dummyConn, func() error {
+	err := runWithCtxInterrupt(ctx, dummyConn, func(_ context.Context) error {
 		called = true
 		return nil
 	})
@@ -48,7 +48,7 @@ func TestRunWithCtxInterrupt_NoCancel_NoInterrupt(t *testing.T) {
 	ctx := context.Background()
 	called := false
 	var dummyConn mapping.Connection
-	err := runWithCtxInterrupt(ctx, dummyConn, func() error {
+	err := runWithCtxInterrupt(ctx, dummyConn, func(_ context.Context) error {
 		called = true
 		return nil
 	})
@@ -74,7 +74,7 @@ func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
 	var dummyConn mapping.Connection
 	doneErrCh := make(chan error)
 	go func() {
-		err := runWithCtxInterrupt(ctx, dummyConn, func() error {
+		err := runWithCtxInterrupt(ctx, dummyConn, func(_ context.Context) error {
 			// Signal that fn is running.
 			close(started)
 			// Wait until test allows return, in the meantime, Interrupts should be happening.
@@ -106,4 +106,56 @@ func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
 	err := <-doneErrCh
 	require.NoError(t, err)
 	require.False(t, testTookTooLong, "The test took too long without calling enough interruptions")
+}
+
+// Test that recursively wrapping with the same context only spawns a single interrupter goroutine.
+func TestRunWithCtxInterrupt_RecursiveOnlyOneGoroutine(t *testing.T) {
+	// Stub Interrupt to avoid calling into CGO with a zero connection.
+	orig := mapping.Interrupt
+	mapping.Interrupt = func(_ mapping.Connection) {}
+	t.Cleanup(func() { mapping.Interrupt = orig })
+
+	// Install a test hook to count interrupter goroutine starts.
+	var startedCount atomic.Int32
+	onInterrupterStart = func() { startedCount.Add(1) }
+	t.Cleanup(func() { onInterrupterStart = nil })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var dummyConn mapping.Connection
+
+	started := make(chan struct{})
+	allowReturn := make(chan struct{})
+
+	doneErrCh := make(chan error, 1)
+	go func() {
+		err := runWithCtxInterrupt(ctx, dummyConn, func(wctx context.Context) error {
+			return runWithCtxInterrupt(wctx, dummyConn, func(wctx2 context.Context) error {
+				return runWithCtxInterrupt(wctx2, dummyConn, func(_ context.Context) error {
+					close(started)
+					<-allowReturn
+					return nil
+				})
+			})
+		})
+		doneErrCh <- err
+	}()
+
+	// Wait until innermost function is running, then cancel to exercise the loop.
+	<-started
+	cancel()
+
+	// Give the scheduler a brief moment to start the outer interrupter goroutine.
+	deadline := time.Now().Add(50 * time.Millisecond)
+	for time.Now().Before(deadline) && startedCount.Load() == 0 {
+		time.Sleep(200 * time.Microsecond)
+	}
+
+	// Only one interrupter goroutine should have been spawned despite nesting.
+	require.Equal(t, int32(1), startedCount.Load(), "only one interrupter goroutine should be spawned for recursive wrapping")
+
+	// Finish the innermost work and ensure no error is returned.
+	close(allowReturn)
+	require.NoError(t, <-doneErrCh)
 }
