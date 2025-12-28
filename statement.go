@@ -147,6 +147,9 @@ func (s *Stmt) StatementType() (StmtType, error) {
 // Bind the parameters to the statement.
 // WARNING: This is a low-level API and should be used with caution.
 func (s *Stmt) Bind(ctx context.Context, args []driver.NamedValue) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if s.closed {
 		return errors.Join(errCouldNotBind, errClosedStmt)
 	}
@@ -154,7 +157,7 @@ func (s *Stmt) Bind(ctx context.Context, args []driver.NamedValue) error {
 		return errors.Join(errCouldNotBind, errUninitializedStmt)
 	}
 
-	return runWithCtxInterrupt(ctx, s.conn.conn, func() error { return s.bind(args) })
+	return s.bind(args)
 }
 
 func (s *Stmt) bindHugeint(val *big.Int, n int) (mapping.State, error) {

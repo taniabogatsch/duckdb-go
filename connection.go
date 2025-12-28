@@ -173,47 +173,38 @@ func (conn *Conn) Close() error {
 }
 
 func (conn *Conn) extractStmts(ctx context.Context, query string) (*mapping.ExtractedStatements, mapping.IdxT, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0, err
+	}
 	var (
-		stmts   mapping.ExtractedStatements
-		count   mapping.IdxT
-		callErr error
+		stmts mapping.ExtractedStatements
+		count mapping.IdxT
 	)
 
-	callErr = runWithCtxInterrupt(ctx, conn.conn, func() error {
-		count = mapping.ExtractStatements(conn.conn, query, &stmts)
-		if count == 0 {
-			errMsg := mapping.ExtractStatementsError(stmts)
-			mapping.DestroyExtracted(&stmts)
-			if errMsg != "" {
-				return getDuckDBError(errMsg)
-			}
-			return errEmptyQuery
+	count = mapping.ExtractStatements(conn.conn, query, &stmts)
+	if count == 0 {
+		errMsg := mapping.ExtractStatementsError(stmts)
+		mapping.DestroyExtracted(&stmts)
+		if errMsg != "" {
+			return nil, 0, getDuckDBError(errMsg)
 		}
-		return nil
-	})
-	if callErr != nil {
-		return nil, 0, callErr
+		return nil, 0, errEmptyQuery
 	}
 
 	return &stmts, count, nil
 }
 
 func (conn *Conn) prepareExtractedStmt(ctx context.Context, extractedStmts mapping.ExtractedStatements, i mapping.IdxT) (*Stmt, error) {
-	var (
-		stmt    mapping.PreparedStatement
-		prepErr error
-	)
-	prepErr = runWithCtxInterrupt(ctx, conn.conn, func() error {
-		state := mapping.PrepareExtractedStatement(conn.conn, extractedStmts, i, &stmt)
-		if state == mapping.StateError {
-			err := getDuckDBError(mapping.PrepareError(stmt))
-			mapping.DestroyPrepare(&stmt)
-			return err
-		}
-		return nil
-	})
-	if prepErr != nil {
-		return nil, prepErr
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	var stmt mapping.PreparedStatement
+	state := mapping.PrepareExtractedStatement(conn.conn, extractedStmts, i, &stmt)
+	if state == mapping.StateError {
+		err := getDuckDBError(mapping.PrepareError(stmt))
+		mapping.DestroyPrepare(&stmt)
+		return nil, err
 	}
 	return &Stmt{conn: conn, preparedStmt: &stmt}, nil
 }
@@ -221,6 +212,10 @@ func (conn *Conn) prepareExtractedStmt(ctx context.Context, extractedStmts mappi
 func (conn *Conn) prepareStmts(ctx context.Context, query string) (*Stmt, error) {
 	if conn.closed {
 		return nil, errClosedCon
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	stmts, count, errExtract := conn.extractStmts(ctx, query)
