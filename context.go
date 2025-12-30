@@ -56,6 +56,9 @@ func (s *contextStore) delete(connId uint64) {
 	s.m.Delete(connId)
 }
 
+// How frequently to `duckdb_interrupt` after ctx cancellation while the DuckDB call is still executing.
+const interruptInterval = 500 * time.Millisecond
+
 // runWithCtxInterrupt runs the function fn (which runs DuckDB mapping call/s),
 // and robustly propagates ctx cancellation to DuckDB by repeatedly calling
 // mapping.Interrupt on the given connection while the call is in flight.
@@ -116,7 +119,7 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func(c
 				return
 			default:
 				mapping.Interrupt(conn)
-				time.Sleep(200 * time.Microsecond)
+				time.Sleep(interruptInterval)
 			}
 		}
 	}()
