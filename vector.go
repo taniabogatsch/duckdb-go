@@ -1,6 +1,8 @@
 package duckdb
 
 import (
+	"math/big"
+	"time"
 	"unsafe"
 
 	"github.com/duckdb/duckdb-go/mapping"
@@ -179,7 +181,7 @@ func (vec *vector) initTS(t Type) {
 		return vec.getTS(t, rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -196,7 +198,7 @@ func (vec *vector) initDate() {
 		return vec.getDate(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -213,7 +215,7 @@ func (vec *vector) initTime(t Type) {
 		return vec.getTime(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*time.Time)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -230,7 +232,7 @@ func (vec *vector) initInterval() {
 		return vec.getInterval(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*Interval)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
@@ -247,7 +249,7 @@ func (vec *vector) initHugeint() {
 		return vec.getHugeint(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
-		if val == nil {
+		if val == nil || val == (*big.Int)(nil) {
 			vec.setNull(rowIdx)
 			return nil
 		}
