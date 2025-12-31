@@ -146,7 +146,13 @@ func (s *Stmt) StatementType() (StmtType, error) {
 
 // Bind the parameters to the statement.
 // WARNING: This is a low-level API and should be used with caution.
-func (s *Stmt) Bind(ctx context.Context, args []driver.NamedValue) error {
+func (s *Stmt) Bind(args []driver.NamedValue) error {
+	return s.BindWithCtx(context.Background(), args)
+}
+
+// BindWithCtx the parameters to the statement.
+// WARNING: This is a low-level API and should be used with caution.
+func (s *Stmt) BindWithCtx(ctx context.Context, args []driver.NamedValue) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -624,7 +630,7 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 		panic("database/sql/driver: misuse of duckdb driver: ExecContext or QueryContext with active Rows")
 	}
 
-	if err := s.Bind(ctx, args); err != nil {
+	if err := s.BindWithCtx(ctx, args); err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
