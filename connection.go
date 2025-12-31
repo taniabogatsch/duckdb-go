@@ -279,7 +279,7 @@ func GetTableNames(c *sql.Conn, query string, qualified bool) ([]string, error) 
 	}
 
 	var tableNames []string
-	for i := mapping.IdxT(0); i < mapping.GetListSize(v); i++ {
+	for i := range mapping.GetListSize(v) {
 		func() {
 			child := mapping.GetListChild(v, i)
 			defer mapping.DestroyValue(&child)
