@@ -98,31 +98,7 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func(c
 	bgDoneCh := make(chan struct{})
 	done := make(chan struct{})
 
-	// Interrupter goroutine
-	go func() {
-		if onInterrupterStart != nil {
-			onInterrupterStart()
-		}
-		select {
-		case <-ctx.Done():
-		case <-done:
-			// finished before cancellation
-			close(bgDoneCh)
-			return
-		}
-
-		// Re-assert interruption until the wrapped function finishes.
-		for {
-			select {
-			case <-done:
-				close(bgDoneCh)
-				return
-			default:
-				mapping.Interrupt(conn)
-				time.Sleep(interruptInterval)
-			}
-		}
-	}()
+	go interrupterRoutine(ctx, conn, done, bgDoneCh)
 
 	// We pass `ctx` to keep that "enriched" context with the mark that we've already spawned a go-routine
 	err := fn(ctx)
@@ -135,4 +111,29 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func(c
 	// If we don't wait for the go-routine to finish, it can cancel that new query.
 	<-bgDoneCh
 	return err
+}
+
+func interrupterRoutine(ctx context.Context, conn mapping.Connection, done <-chan struct{}, bgDoneCh chan<- struct{}) {
+	if onInterrupterStart != nil {
+		onInterrupterStart()
+	}
+	select {
+	case <-ctx.Done():
+	case <-done:
+		// finished before cancellation
+		close(bgDoneCh)
+		return
+	}
+
+	// Re-assert interruption until the wrapped function finishes.
+	for {
+		select {
+		case <-done:
+			close(bgDoneCh)
+			return
+		default:
+			mapping.Interrupt(conn)
+			time.Sleep(interruptInterval)
+		}
+	}
 }
