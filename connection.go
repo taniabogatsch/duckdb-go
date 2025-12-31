@@ -182,12 +182,9 @@ func (conn *Conn) extractStmts(ctx context.Context, query string) (*mapping.Extr
 	if err := ctx.Err(); err != nil {
 		return nil, 0, err
 	}
-	var (
-		stmts mapping.ExtractedStatements
-		count mapping.IdxT
-	)
 
-	count = mapping.ExtractStatements(conn.conn, query, &stmts)
+	var stmts mapping.ExtractedStatements
+	count := mapping.ExtractStatements(conn.conn, query, &stmts)
 	if count == 0 {
 		errMsg := mapping.ExtractStatementsError(stmts)
 		mapping.DestroyExtracted(&stmts)
