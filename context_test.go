@@ -60,6 +60,11 @@ func TestRunWithCtxInterrupt_NoCancel_NoInterrupt(t *testing.T) {
 
 // Test that after cancellation, Interrupt is invoked repeatedly until fn returns.
 func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
+	// Use a shorter interval for testing.
+	origInterval := interruptInterval
+	interruptInterval = 100 * time.Millisecond
+	t.Cleanup(func() { interruptInterval = origInterval })
+
 	var count atomic.Int64
 	orig := mapping.Interrupt
 	mapping.Interrupt = func(_ mapping.Connection) { count.Add(1) }
@@ -90,9 +95,9 @@ func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
 
 	testTookTooLong := false
 	// Wait until at least a few interrupts have been observed.
-	deadline := time.Now().Add(100 * time.Millisecond)
+	deadline := time.Now().Add(interruptInterval * 5)
 	for count.Load() < 3 && time.Now().Before(deadline) {
-		time.Sleep(200 * time.Microsecond)
+		time.Sleep(1 * time.Millisecond)
 		// break if the test takes too long before we have enough interrupts
 		if time.Now().After(deadline.Add(1 * time.Second)) {
 			testTookTooLong = true
@@ -101,11 +106,18 @@ func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
 	}
 	require.GreaterOrEqual(t, count.Load(), int64(1), "Interrupt should be called after cancellation")
 
-	// Allow the function to finish; wrapper should stop interrupting immediately after.
+	// Allow the function to finish
+	// The wrapper should stop interrupting immediately after.
 	close(allowReturn)
 	err := <-doneErrCh
 	require.NoError(t, err)
 	require.False(t, testTookTooLong, "The test took too long without calling enough interruptions")
+
+	// Validate that interruptions stop after the wrapped function finishes.
+	finalCount := count.Load()
+	// Wait longer than interruptInterval
+	time.Sleep(interruptInterval + 100*time.Millisecond)
+	require.Equal(t, finalCount, count.Load(), "Interrupt should not be called after fn returns")
 }
 
 // Test that recursively wrapping with the same context only spawns a single interrupter goroutine.

@@ -57,7 +57,7 @@ func (s *contextStore) delete(connId uint64) {
 }
 
 // How frequently to `duckdb_interrupt` after ctx cancellation while the DuckDB call is still executing.
-const interruptInterval = 500 * time.Millisecond
+var interruptInterval = 500 * time.Millisecond
 
 // runWithCtxInterrupt runs the function fn (which runs DuckDB mapping call/s),
 // and robustly propagates ctx cancellation to DuckDB by repeatedly calling
