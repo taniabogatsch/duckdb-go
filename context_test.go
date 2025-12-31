@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/duckdb/duckdb-go/mapping"
 	"github.com/stretchr/testify/require"
+
+	"github.com/duckdb/duckdb-go/mapping"
 )
 
 // Test that if the context is already canceled before entering the wrapper,
