@@ -124,7 +124,6 @@ func (conn *Conn) Prepare(query string) (driver.Stmt, error) {
 		return nil, errors.Join(errPrepare, errClosedCon)
 	}
 
-	// Prepare without external context: use Background for interruption scoping.
 	stmts, count, err := conn.extractStmts(context.Background(), query)
 	if err != nil {
 		return nil, err
