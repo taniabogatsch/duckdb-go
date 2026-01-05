@@ -123,15 +123,18 @@ func TestRunWithCtxInterrupt_Cancel_RepeatsUntilDone(t *testing.T) {
 
 // Test that recursively wrapping with the same context only spawns a single interrupter goroutine.
 func TestRunWithCtxInterrupt_RecursiveOnlyOneGoroutine(t *testing.T) {
-	// Stub Interrupt to avoid calling into CGO with a zero connection.
-	orig := mapping.Interrupt
-	mapping.Interrupt = func(_ mapping.Connection) {}
-	t.Cleanup(func() { mapping.Interrupt = orig })
+	// Set a high interval to ensure only one call per goroutine until deadline set below
+	origInterval := interruptInterval
+	interruptInterval = 1 * time.Second
+	t.Cleanup(func() { interruptInterval = origInterval })
 
-	// Install a test hook to count interrupter goroutine starts.
-	var startedCount atomic.Int32
-	onInterrupterStart = func() { startedCount.Add(1) }
-	t.Cleanup(func() { onInterrupterStart = nil })
+	// Stub Interrupt to count calls
+	var interruptCount atomic.Int32
+	orig := mapping.Interrupt
+	mapping.Interrupt = func(_ mapping.Connection) {
+		interruptCount.Add(1)
+	}
+	t.Cleanup(func() { mapping.Interrupt = orig })
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -161,12 +164,12 @@ func TestRunWithCtxInterrupt_RecursiveOnlyOneGoroutine(t *testing.T) {
 
 	// Give the scheduler a brief moment to start the outer interrupter goroutine.
 	deadline := time.Now().Add(50 * time.Millisecond)
-	for time.Now().Before(deadline) && startedCount.Load() == 0 {
+	for time.Now().Before(deadline) && interruptCount.Load() == 0 {
 		time.Sleep(200 * time.Microsecond)
 	}
 
 	// Only one interrupter goroutine should have been spawned despite nesting.
-	require.Equal(t, int32(1), startedCount.Load(), "only one interrupter goroutine should be spawned for recursive wrapping")
+	require.Equal(t, int32(1), interruptCount.Load(), "only one interrupter goroutine should be spawned for recursive wrapping")
 
 	// Finish the innermost work and ensure no error is returned.
 	close(allowReturn)

@@ -20,10 +20,6 @@ func newContextStore() *contextStore {
 	}
 }
 
-// onInterrupterStart is an optional test hook called when an interrupter
-// goroutine is started. It is intended to be set only from tests.
-var onInterrupterStart func()
-
 func (s *contextStore) load(connId uint64) context.Context {
 	v, ok := s.m.Load(connId)
 	if !ok {
@@ -116,9 +112,6 @@ func runWithCtxInterrupt(ctx context.Context, conn mapping.Connection, fn func(c
 }
 
 func interrupterRoutine(ctx context.Context, conn mapping.Connection, done <-chan struct{}, bgDoneCh chan<- struct{}) {
-	if onInterrupterStart != nil {
-		onInterrupterStart()
-	}
 	select {
 	case <-ctx.Done():
 	case <-done:
