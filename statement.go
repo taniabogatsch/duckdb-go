@@ -472,8 +472,12 @@ func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driv
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
@@ -566,15 +570,10 @@ func (s *Stmt) ExecBound(ctx context.Context) (driver.Result, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	var res *mapping.Result
-	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
-		var executeBoundErr error
-		res, executeBoundErr = s.executeBound(wctx)
-		return executeBoundErr
-	}); err != nil {
+	res, err := s.executeBound(ctx)
+	if err != nil {
 		return nil, err
 	}
-
 	defer mapping.DestroyResult(res)
 
 	ra := int64(mapping.RowsChanged(res))
@@ -592,8 +591,12 @@ func (s *Stmt) QueryContext(ctx context.Context, nargs []driver.NamedValue) (dri
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	s.rows = true
