@@ -566,10 +566,15 @@ func (s *Stmt) ExecBound(ctx context.Context) (driver.Result, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
+
 	defer mapping.DestroyResult(res)
 
 	ra := int64(mapping.RowsChanged(res))
@@ -612,10 +617,15 @@ func (s *Stmt) QueryBound(ctx context.Context) (driver.Rows, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
+
 	s.rows = true
 	return newRowsWithStmt(*res, s), nil
 }
@@ -636,21 +646,25 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return s.executeBound(ctx)
+
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
 	// Phase 1: create pending result under interrupt-aware wrapper
-	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
-		if mapping.PendingPrepared(*s.preparedStmt, &pendingRes) == mapping.StateError {
-			dbErr := getDuckDBError(mapping.PendingError(pendingRes))
-			mapping.DestroyPending(&pendingRes)
-			return dbErr
-		}
-		return nil
-	}); err != nil {
-		return nil, err
+	if mapping.PendingPrepared(*s.preparedStmt, &pendingRes) == mapping.StateError {
+		dbErr := getDuckDBError(mapping.PendingError(pendingRes))
+		mapping.DestroyPending(&pendingRes)
+		return nil, dbErr
 	}
 	defer mapping.DestroyPending(&pendingRes)
 
@@ -661,15 +675,10 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 
 	// Phase 2: execute pending under interrupt-aware wrapper
 	var res mapping.Result
-	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
-		state := mapping.ExecutePending(pendingRes, &res)
-		if state == mapping.StateError {
-			return getDuckDBError(mapping.ResultError(&res))
-		}
-		return nil
-	}); err != nil {
+	state := mapping.ExecutePending(pendingRes, &res)
+	if state == mapping.StateError {
 		mapping.DestroyResult(&res)
-		return nil, errors.Join(ctx.Err(), err)
+		return nil, getDuckDBError(mapping.ResultError(&res))
 	}
 
 	return &res, nil
