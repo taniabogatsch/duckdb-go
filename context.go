@@ -75,6 +75,8 @@ var interruptInterval = 500 * time.Millisecond
 //
 //   - This function is a bit "dangerous" as we're spawning a go-routine from within,
 //     so we will need to be mindful of this when we're using it
+//     until writing this wrapper, we used to spawn go-routines when we call DuckDB's physical executions,
+//     but now we use it for the whole top-level calls, and sometimes those calls can be nested.
 //
 //   - We never call interrupt unless ctx is canceled.
 //
