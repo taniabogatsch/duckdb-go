@@ -235,7 +235,9 @@ func (conn *Conn) prepareStmts(ctx context.Context, query string) (*Stmt, error)
 
 		// Check for cancellation between prepare and execute
 		if err := ctx.Err(); err != nil {
-			_ = preparedStmt.Close()
+			if closeErr := preparedStmt.Close(); closeErr != nil {
+				return nil, errors.Join(err, closeErr)
+			}
 			return nil, err
 		}
 
