@@ -69,11 +69,6 @@ var interruptInterval = 500 * time.Millisecond
 //   - The interrupt loop is strictly scoped to the lifetime of this call and
 //     stops immediately when fn returns, to avoid goroutine leaks.
 //
-//   - This function is a bit "dangerous" as we're spawning a go-routine from within,
-//     so we will need to be mindful of this when we're using it
-//     until writing this wrapper, we used to spawn go-routines when we call DuckDB's physical executions,
-//     but now we use it for the whole top-level calls, and sometimes those calls can be nested.
-//
 //   - We never call interrupt unless ctx is canceled.
 //
 //   - The callback fn receives a derived context that carries an internal marker.
