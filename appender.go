@@ -105,6 +105,7 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 	return a.initAppenderChunk()
 }
 
+// When providing columns to the appender (during initialization), we activate them first fetch their types.
 func initTableColumns(columns []string, a *Appender) (err error) {
 	for i, col := range columns {
 		if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
