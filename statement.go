@@ -659,7 +659,7 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
-	// Phase 1: create pending result under interrupt-aware wrapper
+	// Phase 1: create pending result
 	if mapping.PendingPrepared(*s.preparedStmt, &pendingRes) == mapping.StateError {
 		dbErr := getDuckDBError(mapping.PendingError(pendingRes))
 		mapping.DestroyPending(&pendingRes)
@@ -672,7 +672,7 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 		return nil, err
 	}
 
-	// Phase 2: execute pending under interrupt-aware wrapper
+	// Phase 2: execute pending
 	var res mapping.Result
 	state := mapping.ExecutePending(pendingRes, &res)
 	if state == mapping.StateError {
