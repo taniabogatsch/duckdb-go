@@ -78,31 +78,9 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 	// BEFORE fetching types, so the type enumeration reflects only the active columns.
 	// (In DuckDB, if columns are not added, BaseAppender::GetActiveTypes() will return all table columns)
 	if len(columns) > 0 {
-		for i, col := range columns {
-			if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
-				duckError := getDuckDBError(mapping.AppenderError(a.appender))
-				mapping.AppenderDestroy(&a.appender)
-				return nil, getError(errAppenderCreation, duckError)
-			}
-
-			colType := mapping.AppenderColumnType(a.appender, mapping.IdxT(i))
-			a.types = append(a.types, colType)
-
-			// Ensure that we only create an appender for supported column types.
-			t := mapping.GetTypeId(colType)
-			if name, found := unsupportedTypeToStringMap[t]; found {
-				err = addIndexToError(unsupportedTypeError(name), i+1)
-				destroyLogicalTypes(a.types)
-				mapping.AppenderDestroy(&a.appender)
-				return nil, getError(errAppenderCreation, err)
-			}
-		}
-
-		// Sanity check: active column count should match provided columns
-		if mapping.AppenderColumnCount(a.appender) != mapping.IdxT(len(columns)) {
-			destroyLogicalTypes(a.types)
+		if err := initTableColumns(columns, &a); err != nil {
 			mapping.AppenderDestroy(&a.appender)
-			return nil, getError(errAppenderCreation, errors.New("duckdb: column count mismatch after activation"))
+			return nil, err
 		}
 	} else {
 		// Get the column types for all columns when no subset is specified (already happens in C++ side when not
@@ -125,6 +103,33 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 	}
 
 	return a.initAppenderChunk()
+}
+
+func initTableColumns(columns []string, a *Appender) (err error) {
+	for i, col := range columns {
+		if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
+			duckError := getDuckDBError(mapping.AppenderError(a.appender))
+			return getError(errAppenderCreation, duckError)
+		}
+
+		colType := mapping.AppenderColumnType(a.appender, mapping.IdxT(i))
+		a.types = append(a.types, colType)
+
+		// Ensure that we only create an appender for supported column types.
+		t := mapping.GetTypeId(colType)
+		if name, found := unsupportedTypeToStringMap[t]; found {
+			err = addIndexToError(unsupportedTypeError(name), i+1)
+			destroyLogicalTypes(a.types)
+			return getError(errAppenderCreation, err)
+		}
+	}
+
+	// Sanity check: active column count should match provided columns
+	if mapping.AppenderColumnCount(a.appender) != mapping.IdxT(len(columns)) {
+		destroyLogicalTypes(a.types)
+		return getError(errAppenderCreation, errors.New("duckdb: column count mismatch after activation"))
+	}
+	return nil
 }
 
 // NewQueryAppender returns a new query Appender.
