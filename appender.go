@@ -106,7 +106,7 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 }
 
 // When providing columns to the appender (during initialization), we activate them first fetch their types.
-func initTableColumns(columns []string, a *Appender) (err error) {
+func initTableColumns(columns []string, a *Appender) error {
 	for i, col := range columns {
 		if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
 			duckError := getDuckDBError(mapping.AppenderError(a.appender))
@@ -119,7 +119,7 @@ func initTableColumns(columns []string, a *Appender) (err error) {
 		// Ensure that we only create an appender for supported column types.
 		t := mapping.GetTypeId(colType)
 		if name, found := unsupportedTypeToStringMap[t]; found {
-			err = addIndexToError(unsupportedTypeError(name), i+1)
+			err := addIndexToError(unsupportedTypeError(name), i+1)
 			destroyLogicalTypes(a.types)
 			return getError(errAppenderCreation, err)
 		}
