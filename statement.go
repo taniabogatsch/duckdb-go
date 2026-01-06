@@ -680,8 +680,9 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var res mapping.Result
 	state := mapping.ExecutePending(pendingRes, &res)
 	if state == mapping.StateError {
+		err := errors.Join(ctx.Err(), getDuckDBError(mapping.ResultError(&res)))
 		mapping.DestroyResult(&res)
-		return nil, getDuckDBError(mapping.ResultError(&res))
+		return nil, err
 	}
 
 	return &res, nil
