@@ -52,6 +52,8 @@ func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Append
 // DuckDB will fill columns not selected with their DEFAULT values (or NULL).
 // Note: Changing the active column set causes a flush in DuckDB. Therefore, we cannot change them later during the
 // lifetime of the Appender.
+// Important: `QueryAppender` is the recommended way to append data to a table with a subset of columns, we expose this
+// mostly for backwards compatibility.
 func NewAppenderWithColumns(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
 	return newTableAppender(driverConn, catalog, schema, table, columns)
 }
