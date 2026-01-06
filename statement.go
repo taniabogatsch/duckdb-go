@@ -570,8 +570,12 @@ func (s *Stmt) ExecBound(ctx context.Context) (driver.Result, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
@@ -650,15 +654,7 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 		return nil, err
 	}
 
-	var res *mapping.Result
-	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
-		var executeBoundErr error
-		res, executeBoundErr = s.executeBound(wctx)
-		return executeBoundErr
-	}); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return s.executeBound(ctx)
 }
 
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
