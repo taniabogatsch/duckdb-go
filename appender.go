@@ -55,6 +55,9 @@ func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Append
 // Important: `QueryAppender` is the recommended way to append data to a table with a subset of columns, we expose this
 // mostly for backwards compatibility.
 func NewAppenderWithColumns(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
+	if len(columns) == 0 {
+		return nil, invalidInputError("empty array", "non-empty array")
+	}
 	return newTableAppender(driverConn, catalog, schema, table, columns)
 }
 
@@ -76,43 +79,52 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 
 	// If a subset of columns is provided, activate only those columns on the appender
 	// BEFORE fetching types, so the type enumeration reflects only the active columns.
-	// (In DuckDB, if columns are not added, BaseAppender::GetActiveTypes() will return all table columns)
 	if len(columns) > 0 {
-		if err := initTableColumns(columns, &a); err != nil {
+		if err := a.initTableColumns(columns); err != nil {
 			mapping.AppenderDestroy(&a.appender)
 			return nil, err
 		}
-	} else {
-		// Get the column types for all columns when no subset is specified (already happens in C++ side when not
-		// activating columns.
-		columnCount := mapping.AppenderColumnCount(a.appender)
-		for i := range uint64(columnCount) {
-			colType := mapping.AppenderColumnType(a.appender, mapping.IdxT(i))
-			a.types = append(a.types, colType)
+		return a.initAppenderChunk()
+	}
 
-			// Ensure that we only create an appender for supported column types.
-			t := mapping.GetTypeId(colType)
-			name, found := unsupportedTypeToStringMap[t]
-			if found {
-				err = addIndexToError(unsupportedTypeError(name), int(i)+1)
-				destroyLogicalTypes(a.types)
-				mapping.AppenderDestroy(&a.appender)
-				return nil, getError(errAppenderCreation, err)
-			}
+	// Get the column types for all columns when no subset is specified (already happens in C++ side when not
+	// activating columns).
+	// (In DuckDB, if columns are not added, BaseAppender::GetActiveTypes() will return all table columns)
+	columnCount := mapping.AppenderColumnCount(a.appender)
+	for i := range uint64(columnCount) {
+		colType := mapping.AppenderColumnType(a.appender, mapping.IdxT(i))
+		a.types = append(a.types, colType)
+
+		// Ensure that we only create an appender for supported column types.
+		t := mapping.GetTypeId(colType)
+		name, found := unsupportedTypeToStringMap[t]
+		if found {
+			err = addIndexToError(unsupportedTypeError(name), int(i)+1)
+			destroyLogicalTypes(a.types)
+			mapping.AppenderDestroy(&a.appender)
+			return nil, getError(errAppenderCreation, err)
 		}
 	}
 
 	return a.initAppenderChunk()
 }
 
-// When providing columns to the appender (during initialization), we activate them first fetch their types.
-func initTableColumns(columns []string, a *Appender) error {
+// When providing columns to the appender (during initialization), we activate them and fetch their types.
+func (a *Appender) initTableColumns(columns []string) error {
+	activatedColumns := make(map[string]struct{}, len(columns))
 	for i, col := range columns {
+		if _, exists := activatedColumns[col]; exists {
+			destroyLogicalTypes(a.types)
+			return getError(errAppenderCreation, errors.New("duplicate column in appender columns list: "+col))
+		}
+
 		if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
 			duckError := getDuckDBError(mapping.AppenderError(a.appender))
 			return getError(errAppenderCreation, duckError)
 		}
 
+		// In DuckDB, when activating a column (`AppenderAddColumn`), we push it to the active types,
+		// and then `AppenderColumnType` will result in the logical type corresponding to that index
 		colType := mapping.AppenderColumnType(a.appender, mapping.IdxT(i))
 		a.types = append(a.types, colType)
 
@@ -123,6 +135,8 @@ func initTableColumns(columns []string, a *Appender) error {
 			destroyLogicalTypes(a.types)
 			return getError(errAppenderCreation, err)
 		}
+
+		activatedColumns[col] = struct{}{}
 	}
 
 	// Sanity check: active column count should match provided columns

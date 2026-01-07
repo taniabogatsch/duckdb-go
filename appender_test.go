@@ -143,11 +143,15 @@ func prepareAppenderWithColumns[T require.TestingT](t T, query string, columns [
 	return c, db, conn, a
 }
 
-func cleanupAppender[T require.TestingT](t T, c *Connector, db *sql.DB, conn driver.Conn, a *Appender) {
-	closeAppenderWrapper(t, a)
+func cleanupDb[T require.TestingT](t T, c *Connector, db *sql.DB, conn driver.Conn) {
 	closeDriverConnWrapper(t, &conn)
 	closeDbWrapper(t, db)
 	closeConnectorWrapper(t, c)
+}
+
+func cleanupAppender[T require.TestingT](t T, c *Connector, db *sql.DB, conn driver.Conn, a *Appender) {
+	closeAppenderWrapper(t, a)
+	cleanupDb(t, c, db, conn)
 }
 
 func TestAppenderClose(t *testing.T) {
@@ -1176,9 +1180,30 @@ func TestNewAppenderWithColumnsInvalidColumn(t *testing.T) {
 	db := sql.OpenDB(c)
 	createTable(t, db, `CREATE TABLE test (id INTEGER, col_b VARCHAR)`)
 	conn := openDriverConnWrapper(t, c)
-	defer func() { closeDriverConnWrapper(t, &conn); closeDbWrapper(t, db); closeConnectorWrapper(t, c) }()
+	defer func() { cleanupDb(t, c, db, conn) }()
 
 	_, err := NewAppenderWithColumns(conn, "", "", "test", []string{"does_not_exist"})
+	require.Error(t, err)
+}
+
+func TestNewAppenderWithColumnsEmptyColumns(t *testing.T) {
+	c := newConnectorWrapper(t, ``, nil)
+	db := sql.OpenDB(c)
+	createTable(t, db, `CREATE TABLE test (id INTEGER, col_b VARCHAR)`)
+	conn := openDriverConnWrapper(t, c)
+	defer func() { cleanupDb(t, c, db, conn) }()
+
+	_, err := NewAppenderWithColumns(conn, "", "", "test", []string{})
+	require.Error(t, err)
+}
+
+func TestNewAppenderWithColumnsDuplicateColumns(t *testing.T) {
+	c := newConnectorWrapper(t, ``, nil)
+	db := sql.OpenDB(c)
+	createTable(t, db, `CREATE TABLE test (id INTEGER, col_b VARCHAR)`)
+	conn := openDriverConnWrapper(t, c)
+	defer func() { cleanupDb(t, c, db, conn) }()
+	_, err := NewAppenderWithColumns(conn, "", "", "test", []string{"col_b", "col_b"})
 	require.Error(t, err)
 }
 
