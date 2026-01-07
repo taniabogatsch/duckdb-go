@@ -1207,6 +1207,16 @@ func TestNewAppenderWithColumnsDuplicateColumns(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewAppenderWithColumnsSubsetGreaterThanTable(t *testing.T) {
+	c := newConnectorWrapper(t, ``, nil)
+	db := sql.OpenDB(c)
+	createTable(t, db, `CREATE TABLE test (id INTEGER, col_b VARCHAR)`)
+	conn := openDriverConnWrapper(t, c)
+	defer func() { cleanupDb(t, c, db, conn) }()
+	_, err := NewAppenderWithColumns(conn, "", "", "test", []string{"col_b", "id", "does_not_exist"})
+	require.Error(t, err)
+}
+
 func BenchmarkAppenderNested(b *testing.B) {
 	c, db, conn, a := prepareAppender(b, createNestedDataTableSQL)
 	defer cleanupAppender(b, c, db, conn, a)

@@ -111,6 +111,12 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 
 // When providing columns to the appender (during initialization), we activate them and fetch their types.
 func (a *Appender) initTableColumns(columns []string) error {
+	// When the subset is greater than all table columns, early-out with an error.
+	if mapping.AppenderColumnCount(a.appender) < mapping.IdxT(len(columns)) {
+		destroyLogicalTypes(a.types)
+		return getError(errAppenderCreation, errors.New("column count exceeds table column count"))
+	}
+
 	activatedColumns := make(map[string]struct{}, len(columns))
 	for i, col := range columns {
 		if _, exists := activatedColumns[col]; exists {
