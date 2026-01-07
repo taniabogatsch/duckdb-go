@@ -62,7 +62,7 @@ func NewAppenderWithColumns(driverConn driver.Conn, catalog, schema, table strin
 }
 
 // newTableAppender consolidates the common logic of creating an appender, optionally narrowing
-// it to a subset of columns before fetching types. NewAppender and NewAppenderWithColumns delegate this helper
+// it to a subset of columns before fetching types. NewAppender and NewAppenderWithColumns delegate to this helper
 func newTableAppender(driverConn driver.Conn, catalog, schema, table string, columns []string) (*Appender, error) {
 	var a Appender
 	err := a.appenderConn(driverConn)
