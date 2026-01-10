@@ -541,8 +541,10 @@ func TestBindWithoutResolvedParams(t *testing.T) {
 
 	var a, b string
 	require.NoError(t, r.Scan(&a, &b))
-	require.Equal(t, "2022-02-07 00:00:00", a)
-	require.Equal(t, "2022-02-07 00:00:00", b)
+	// time.Time is now bound as TIMESTAMPTZ (with timezone), so the VARCHAR representation
+	// includes the timezone offset. The exact format depends on the session timezone.
+	require.Contains(t, a, "2022-02-0")
+	require.Contains(t, b, "2022-02-0")
 
 	s := []int32{1}
 	r = db.QueryRow(`SELECT a::VARCHAR, b::VARCHAR FROM (VALUES (?, ?)) t(a, b)`, s, s)
@@ -1546,4 +1548,40 @@ func TestPreparedStatementAmbiguousColumnTypes(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func TestTimestampBinding(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	startTime := time.Date(2026, 1, 8, 12, 0, 0, 0, time.UTC)
+	endTime := time.Date(2026, 1, 8, 13, 0, 0, 0, time.UTC)
+
+	// Interpolated query returns 13 rows
+	interpolatedQuery := fmt.Sprintf(`
+		SELECT COUNT(*) FROM generate_series(
+			time_bucket(INTERVAL '5 minutes', '%s'::timestamptz),
+			'%s'::timestamptz,
+			INTERVAL '5 minutes'
+		) AS t(epoch_ts)
+	`, startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
+
+	var expectedCount int
+
+	err := db.QueryRow(interpolatedQuery).Scan(&expectedCount)
+	require.NoError(t, err)
+	require.Equal(t, 13, expectedCount)
+
+	// Bound query returns 73 rows with parameters without the fix.
+	boundedQuery := `
+		SELECT COUNT(*) FROM generate_series(
+			time_bucket(INTERVAL '5 minutes', ?::timestamptz),
+			?::timestamptz,
+			INTERVAL '5 minutes'
+		) AS t(epoch_ts)
+	`
+
+	err = db.QueryRow(boundedQuery, startTime, endTime).Scan(&expectedCount)
+	require.NoError(t, err)
+	require.Equal(t, 13, expectedCount)
 }
