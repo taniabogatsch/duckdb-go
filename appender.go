@@ -113,7 +113,6 @@ func newTableAppender(driverConn driver.Conn, catalog, schema, table string, col
 func (a *Appender) initTableColumns(columns []string) error {
 	// When the subset is greater than all table columns, early-out with an error.
 	if mapping.AppenderColumnCount(a.appender) < mapping.IdxT(len(columns)) {
-		destroyLogicalTypes(a.types)
 		return getError(errAppenderCreation, errors.New("column count exceeds table column count"))
 	}
 
@@ -125,6 +124,7 @@ func (a *Appender) initTableColumns(columns []string) error {
 		}
 
 		if mapping.AppenderAddColumn(a.appender, col) == mapping.StateError {
+			destroyLogicalTypes(a.types)
 			duckError := getDuckDBError(mapping.AppenderError(a.appender))
 			return getError(errAppenderCreation, duckError)
 		}
