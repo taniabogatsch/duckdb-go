@@ -147,12 +147,22 @@ func (s *Stmt) StatementType() (StmtType, error) {
 // Bind the parameters to the statement.
 // WARNING: This is a low-level API and should be used with caution.
 func (s *Stmt) Bind(args []driver.NamedValue) error {
+	return s.BindWithCtx(context.Background(), args)
+}
+
+// BindWithCtx takes a context and binds the parameters to the statement.
+// WARNING: This is a low-level API and should be used with caution.
+func (s *Stmt) BindWithCtx(ctx context.Context, args []driver.NamedValue) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if s.closed {
 		return errors.Join(errCouldNotBind, errClosedStmt)
 	}
 	if s.preparedStmt == nil {
 		return errors.Join(errCouldNotBind, errUninitializedStmt)
 	}
+
 	return s.bind(args)
 }
 
@@ -462,8 +472,12 @@ func (s *Stmt) ExecContext(ctx context.Context, nargs []driver.NamedValue) (driv
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
@@ -556,8 +570,12 @@ func (s *Stmt) ExecBound(ctx context.Context) (driver.Result, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
 	defer mapping.DestroyResult(res)
@@ -577,8 +595,12 @@ func (s *Stmt) QueryContext(ctx context.Context, nargs []driver.NamedValue) (dri
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.execute(ctx, nargs)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeErr error
+		res, executeErr = s.execute(wctx, nargs)
+		return executeErr
+	}); err != nil {
 		return nil, err
 	}
 	s.rows = true
@@ -602,10 +624,15 @@ func (s *Stmt) QueryBound(ctx context.Context) (driver.Rows, error) {
 	cleanupCtx := s.conn.setContext(ctx)
 	defer cleanupCtx()
 
-	res, err := s.executeBound(ctx)
-	if err != nil {
+	var res *mapping.Result
+	if err := runWithCtxInterrupt(ctx, s.conn.conn, func(wctx context.Context) error {
+		var executeBoundErr error
+		res, executeBoundErr = s.executeBound(wctx)
+		return executeBoundErr
+	}); err != nil {
 		return nil, err
 	}
+
 	s.rows = true
 	return newRowsWithStmt(*res, s), nil
 }
@@ -620,14 +647,19 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 		panic("database/sql/driver: misuse of duckdb driver: ExecContext or QueryContext with active Rows")
 	}
 
-	if err := s.bind(args); err != nil {
+	if err := s.BindWithCtx(ctx, args); err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	return s.executeBound(ctx)
 }
 
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
+	// Phase 1: create pending result
 	if mapping.PendingPrepared(*s.preparedStmt, &pendingRes) == mapping.StateError {
 		dbErr := getDuckDBError(mapping.PendingError(pendingRes))
 		mapping.DestroyPending(&pendingRes)
@@ -635,37 +667,14 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	}
 	defer mapping.DestroyPending(&pendingRes)
 
-	mainDoneCh := make(chan struct{})
-	bgDoneCh := make(chan struct{})
+	// Short-circuit before execution
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
-	// go-routine waiting to receive on the context or main channel.
-	go func() {
-		select {
-		// Await an interrupt on the context.
-		case <-ctx.Done():
-			mapping.Interrupt(s.conn.conn)
-			break
-		// Await a done-signal on the main channel.
-		// Reading from a closed channel succeeds immediately.
-		case <-mainDoneCh:
-			break
-		}
-		close(bgDoneCh)
-	}()
-
+	// Phase 2: execute pending
 	var res mapping.Result
 	state := mapping.ExecutePending(pendingRes, &res)
-
-	// We finished executing the pending query.
-	// Close the main channel.
-	close(mainDoneCh)
-
-	// Wait for the background go-routine to finish, too.
-	// Sometimes the go-routine is not scheduled immediately.
-	// By the time it is scheduled, another query might be running on this connection.
-	// If we don't wait for the go-routine to finish, it can cancel that new query.
-	<-bgDoneCh
-
 	if state == mapping.StateError {
 		err := errors.Join(ctx.Err(), getDuckDBError(mapping.ResultError(&res)))
 		mapping.DestroyResult(&res)

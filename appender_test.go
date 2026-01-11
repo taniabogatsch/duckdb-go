@@ -597,6 +597,108 @@ func TestAppenderTime(t *testing.T) {
 	require.Equal(t, base.UnixMicro(), r.UnixMicro())
 }
 
+func TestAppenderNullTimestampTZ(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (ts TIMESTAMPTZ)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *time.Time.
+	var nilTime *time.Time
+	require.NoError(t, a.AppendRow(nilTime))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT ts FROM test`)
+
+	var r *time.Time
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullDate(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (d DATE)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *time.Time.
+	var nilTime *time.Time
+	require.NoError(t, a.AppendRow(nilTime))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT d FROM test`)
+
+	var r *time.Time
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullTime(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (t TIME)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *time.Time.
+	var nilTime *time.Time
+	require.NoError(t, a.AppendRow(nilTime))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT t FROM test`)
+
+	var r *time.Time
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullTimeTZ(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (t TIMETZ)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *time.Time.
+	var nilTime *time.Time
+	require.NoError(t, a.AppendRow(nilTime))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT t FROM test`)
+
+	var r *time.Time
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullInterval(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (i INTERVAL)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *Interval.
+	var nilInterval *Interval
+	require.NoError(t, a.AppendRow(nilInterval))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT i FROM test`)
+
+	var r *Interval
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullHugeInt(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (h HUGEINT)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *big.Int.
+	var nilBigInt *big.Int
+	require.NoError(t, a.AppendRow(nilBigInt))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT h FROM test`)
+
+	var r *big.Int
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
 func TestAppenderTimeTZ(t *testing.T) {
 	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (time TIMETZ)`)
 	defer cleanupAppender(t, c, db, conn, a)
