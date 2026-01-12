@@ -69,7 +69,7 @@ func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 
 	err = column.setFn(column, mapping.IdxT(rowIdx), val)
 	if err != nil {
-		return setValueError(rowIdx, colIdx, val, err)
+		return setValueError(colIdx, rowIdx, val, err)
 	}
 
 	return nil

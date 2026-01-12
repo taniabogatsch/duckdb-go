@@ -1130,18 +1130,29 @@ func TestInterrupt(t *testing.T) {
 	defer closeDbWrapper(t, db)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
 
 	// Long-running query.
 	go func() {
 		_, err := db.ExecContext(ctx, "CREATE TABLE t AS SELECT range::VARCHAR, random() AS k FROM range(1_000_000_000) ORDER BY k")
-		require.ErrorContains(t, err, "INTERRUPT Error: Interrupted!")
+		done <- err
 	}()
 
 	// Interrupt it.
 	time.Sleep(1 * time.Millisecond)
-	go func() {
-		cancel()
-	}()
+	cancel()
+
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
+		require.ErrorContains(t, err, "INTERRUPT Error: Interrupted!")
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "TestInterrupt timed out waiting for query to finish after cancel")
+	}
 }
 
 func TestPreparedStatementColumnMethods(t *testing.T) {
