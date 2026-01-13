@@ -525,6 +525,21 @@ func newAppenderHugeIntTest[T numericType](val T, db *sql.DB, a *Appender) func(
 	}
 }
 
+func newAppenderHugeIntFloatTest[T float32 | float64](val T, lower, upper *big.Int, db *sql.DB, a *Appender) func(t *testing.T) {
+	return func(t *testing.T) {
+		typeName := reflect.TypeOf(val).String()
+		require.NoError(t, a.AppendRow(val, typeName))
+		require.NoError(t, a.Flush())
+
+		res := db.QueryRowContext(context.Background(), `SELECT val FROM test WHERE id == ?`, typeName)
+
+		var r *big.Int
+		require.NoError(t, res.Scan(&r))
+		require.True(t, r.Cmp(lower) >= 0, "result %v should be >= lower bound %v", r, lower)
+		require.True(t, r.Cmp(upper) <= 0, "result %v should be <= upper bound %v", r, upper)
+	}
+}
+
 func TestAppenderHugeInt(t *testing.T) {
 	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (val HUGEINT, id VARCHAR)`)
 	defer cleanupAppender(t, c, db, conn, a)
@@ -537,9 +552,10 @@ func TestAppenderHugeInt(t *testing.T) {
 		"uint8":   newAppenderHugeIntTest[uint8](5, db, a),
 		"uint16":  newAppenderHugeIntTest[uint16](6, db, a),
 		"uint32":  newAppenderHugeIntTest[uint32](7, db, a),
-		"uint64":  newAppenderHugeIntTest[uint64](8, db, a),
-		"float32": newAppenderHugeIntTest[float32](9, db, a),
-		"float64": newAppenderHugeIntTest[float64](10, db, a),
+		"uint64": newAppenderHugeIntTest[uint64](8, db, a),
+		// Use values > int64 max (~9.2e18) to test the overflow fix
+		"float32": newAppenderHugeIntFloatTest[float32](1e19, big.NewInt(9e18), new(big.Int).Mul(big.NewInt(11), big.NewInt(1e18)), db, a),
+		"float64": newAppenderHugeIntFloatTest[float64](1e20, new(big.Int).Mul(big.NewInt(99), big.NewInt(1e18)), new(big.Int).Mul(big.NewInt(101), big.NewInt(1e18)), db, a),
 	}
 	for name, test := range tests {
 		t.Run(name, test)

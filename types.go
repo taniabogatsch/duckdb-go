@@ -191,13 +191,15 @@ func inferHugeInt(val any) (mapping.HugeInt, error) {
 			return mapping.HugeInt{}, err
 		}
 	case float32:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
+		bigFloat := new(big.Float).SetFloat64(float64(v))
+		bigInt, _ := bigFloat.Int(nil)
+		if hi, err = hugeIntFromNative(bigInt); err != nil {
 			return mapping.HugeInt{}, err
 		}
 	case float64:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
+		bigFloat := new(big.Float).SetFloat64(v)
+		bigInt, _ := bigFloat.Int(nil)
+		if hi, err = hugeIntFromNative(bigInt); err != nil {
 			return mapping.HugeInt{}, err
 		}
 	case *big.Int:
