@@ -167,29 +167,23 @@ func inferHugeInt(val any) (mapping.HugeInt, error) {
 	case uint8:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int8:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint16:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int16:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint32:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int32:
-		hi = mapping.NewHugeInt(uint64(v), 0)
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case uint64:
 		hi = mapping.NewHugeInt(v, 0)
 	case int64:
-		hi, err = hugeIntFromNative(big.NewInt(v))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
+		hi = mapping.NewHugeInt(uint64(v), v>>63)
 	case uint:
 		hi = mapping.NewHugeInt(uint64(v), 0)
 	case int:
-		hi, err = hugeIntFromNative(big.NewInt(int64(v)))
-		if err != nil {
-			return mapping.HugeInt{}, err
-		}
+		hi = mapping.NewHugeInt(uint64(v), int64(v)>>63)
 	case float32:
 		bigFloat := new(big.Float).SetFloat64(float64(v))
 		bigInt, _ := bigFloat.Int(nil)
@@ -220,7 +214,7 @@ func inferHugeInt(val any) (mapping.HugeInt, error) {
 		return mapping.HugeInt{}, castError(reflect.TypeOf(val).String(), reflectTypeHugeInt.String())
 	}
 
-	return hi, nil
+	return hi, err
 }
 
 type Map map[any]any
