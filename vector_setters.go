@@ -164,6 +164,15 @@ func setHugeint[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	return nil
 }
 
+func setUhugeint[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	uhi, err := inferUHugeInt(val)
+	if err != nil {
+		return err
+	}
+	setPrimitive(vec, rowIdx, uhi)
+	return nil
+}
+
 func setBytes[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	switch v := any(val).(type) {
 	case string:
@@ -443,6 +452,8 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setInterval(vec, rowIdx, val)
 	case TYPE_HUGEINT:
 		return setHugeint(vec, rowIdx, val)
+	case TYPE_UHUGEINT:
+		return setUhugeint(vec, rowIdx, val)
 	case TYPE_VARCHAR:
 		return setBytes(vec, rowIdx, val)
 	case TYPE_BLOB:

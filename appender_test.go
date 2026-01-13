@@ -563,6 +563,27 @@ func TestAppenderHugeInt(t *testing.T) {
 	}
 }
 
+func TestAppenderUHugeInt(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (val UHUGEINT, id VARCHAR)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	tests := map[string]func(t *testing.T){
+		"max_uint8":  newAppenderHugeIntTest[uint8](math.MaxUint8, big.NewInt(math.MaxUint8), db, a),
+		"max_uint16": newAppenderHugeIntTest[uint16](math.MaxUint16, big.NewInt(math.MaxUint16), db, a),
+		"max_uint32": newAppenderHugeIntTest[uint32](math.MaxUint32, big.NewInt(math.MaxUint32), db, a),
+		"max_uint64": newAppenderHugeIntTest[uint64](math.MaxUint64, new(big.Int).SetUint64(math.MaxUint64), db, a),
+		"max_int8":   newAppenderHugeIntTest[int8](math.MaxInt8, big.NewInt(math.MaxInt8), db, a),
+		"max_int16":  newAppenderHugeIntTest[int16](math.MaxInt16, big.NewInt(math.MaxInt16), db, a),
+		"max_int32":  newAppenderHugeIntTest[int32](math.MaxInt32, big.NewInt(math.MaxInt32), db, a),
+		"max_int64":  newAppenderHugeIntTest[int64](math.MaxInt64, big.NewInt(math.MaxInt64), db, a),
+		"float32":    newAppenderHugeIntFloatTest[float32](1e19, big.NewInt(9e18), new(big.Int).Mul(big.NewInt(11), big.NewInt(1e18)), db, a),
+		"float64":    newAppenderHugeIntFloatTest[float64](1e20, new(big.Int).Mul(big.NewInt(99), big.NewInt(1e18)), new(big.Int).Mul(big.NewInt(101), big.NewInt(1e18)), db, a),
+	}
+	for name, test := range tests {
+		t.Run(name, test)
+	}
+}
+
 func TestAppenderTsNs(t *testing.T) {
 	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (timestamp TIMESTAMP_NS)`)
 	defer cleanupAppender(t, c, db, conn, a)
@@ -701,6 +722,23 @@ func TestAppenderNullInterval(t *testing.T) {
 
 func TestAppenderNullHugeInt(t *testing.T) {
 	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (h HUGEINT)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *big.Int.
+	var nilBigInt *big.Int
+	require.NoError(t, a.AppendRow(nilBigInt))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT h FROM test`)
+
+	var r *big.Int
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullUHugeInt(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (h UHUGEINT)`)
 	defer cleanupAppender(t, c, db, conn, a)
 
 	// Append a nil *big.Int.
