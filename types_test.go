@@ -105,7 +105,7 @@ func (r *testTypesRow) toUTC() {
 	r.Timestamp_s_col = r.Timestamp_s_col.UTC()
 	r.Timestamp_ms_col = r.Timestamp_ms_col.UTC()
 	r.Timestamp_ns_col = r.Timestamp_ns_col.UTC()
-	r.Time_tz_col = r.Time_tz_col.UTC()
+	// Time_tz_col preserves timezone, no UTC conversion.
 	r.Timestamp_tz_col = r.Timestamp_tz_col.UTC()
 }
 
@@ -306,6 +306,11 @@ func TestTypes(t *testing.T) {
 
 	for i := range actualRows {
 		expectedRows[i].toUTC()
+		// Time_tz_col preserves timezone, compare using Equal() which compares instants.
+		require.True(t, expectedRows[i].Time_tz_col.Equal(actualRows[i].Time_tz_col),
+			"Time_tz_col mismatch: expected %v, got %v", expectedRows[i].Time_tz_col, actualRows[i].Time_tz_col)
+		// Set to same value for struct comparison.
+		actualRows[i].Time_tz_col = expectedRows[i].Time_tz_col
 		require.Equal(t, expectedRows[i], actualRows[i])
 	}
 	require.Len(t, actualRows, len(expectedRows))
@@ -715,7 +720,8 @@ func TestTime(t *testing.T) {
 
 	err = db.QueryRow(`SELECT ?::TIMETZ`, timeTZ).Scan(&res)
 	require.NoError(t, err)
-	require.Equal(t, timeTZ.UTC(), res)
+	// TIMETZ preserves the time and timezone offset.
+	require.True(t, timeTZ.Equal(res), "expected %v, got %v", timeTZ, res)
 }
 
 func TestENUMs(t *testing.T) {
