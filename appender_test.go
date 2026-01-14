@@ -532,8 +532,8 @@ func newAppenderHugeIntFloatTest[T float32 | float64](val T, lower, upper *big.I
 
 		var r *big.Int
 		require.NoError(t, res.Scan(&r))
-		require.True(t, r.Cmp(lower) >= 0, "result %v should be >= lower bound %v", r, lower)
-		require.True(t, r.Cmp(upper) <= 0, "result %v should be <= upper bound %v", r, upper)
+		require.GreaterOrEqual(t, r.Cmp(lower), 0, "result %v should be >= lower bound %v", r, lower)
+		require.LessOrEqual(t, r.Cmp(upper), 0, "result %v should be <= upper bound %v", r, upper)
 	}
 }
 
