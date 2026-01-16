@@ -125,6 +125,11 @@ func (vec *vector) getHugeint(rowIdx mapping.IdxT) *big.Int {
 	return hugeIntToNative(&hugeInt)
 }
 
+func (vec *vector) getUhugeint(rowIdx mapping.IdxT) *big.Int {
+	uhugeInt := getPrimitive[mapping.UHugeInt](vec, rowIdx)
+	return uhugeIntToNative(&uhugeInt)
+}
+
 func (vec *vector) getBytes(rowIdx mapping.IdxT) any {
 	strT := getPrimitive[mapping.StringT](vec, rowIdx)
 	str := mapping.StringTData(&strT)

@@ -64,6 +64,9 @@ func getValue(v mapping.Value) (any, error) {
 	case TYPE_HUGEINT:
 		hugeInt := mapping.GetHugeInt(v)
 		return hugeIntToNative(&hugeInt), nil
+	case TYPE_UHUGEINT:
+		uhugeInt := mapping.GetUHugeInt(v)
+		return uhugeIntToNative(&uhugeInt), nil
 	case TYPE_VARCHAR:
 		return mapping.GetVarchar(v), nil
 	case TYPE_SQLNULL:
@@ -174,6 +177,12 @@ func createPrimitiveValue(t mapping.Type, v any) (mapping.Value, error) {
 			return mapping.Value{}, err
 		}
 		return mapping.CreateHugeInt(vv), nil
+	case TYPE_UHUGEINT:
+		vv, err := inferUHugeInt(v)
+		if err != nil {
+			return mapping.Value{}, err
+		}
+		return mapping.CreateUHugeInt(vv), nil
 	case TYPE_UUID:
 		vv, err := inferUUID(v)
 		if err != nil {
@@ -347,7 +356,7 @@ func isPrimitiveType(t Type) bool {
 	case TYPE_DECIMAL, TYPE_ENUM, TYPE_LIST, TYPE_STRUCT, TYPE_MAP, TYPE_ARRAY, TYPE_UNION:
 		// Complex type.
 		return false
-	case TYPE_INVALID, TYPE_UHUGEINT, TYPE_BIT, TYPE_ANY, TYPE_BIGNUM:
+	case TYPE_INVALID, TYPE_BIT, TYPE_ANY, TYPE_BIGNUM:
 		// Invalid or unsupported.
 		return false
 	}
