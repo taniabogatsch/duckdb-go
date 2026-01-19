@@ -536,21 +536,18 @@ func TestBindWithoutResolvedParams(t *testing.T) {
 
 	d := time.Date(2022, 0o2, 0o7, 0, 0, 0, 0, time.UTC)
 
-	r := db.QueryRow(`SELECT a::VARCHAR, b::VARCHAR FROM (VALUES (?, ?)) t(a, b)`, d, d)
-	require.NoError(t, r.Err())
-
-	var a, b string
-	require.NoError(t, r.Scan(&a, &b))
-	// time.Time is now bound as TIMESTAMPTZ (with timezone), so the VARCHAR representation
-	// includes the timezone offset. The exact format depends on the session timezone.
-	require.Contains(t, a, "2022-02-0")
-	require.Contains(t, b, "2022-02-0")
+	r := db.QueryRow(`SELECT a, b FROM (VALUES (?::TIMESTAMPTZ, ?::TIMESTAMPTZ)) t(a, b)`, d, d)
+	var ta, tb time.Time
+	require.NoError(t, r.Scan(&ta, &tb))
+	require.True(t, ta.Equal(d))
+	require.True(t, tb.Equal(d))
 
 	s := []int32{1}
 	r = db.QueryRow(`SELECT a::VARCHAR, b::VARCHAR FROM (VALUES (?, ?)) t(a, b)`, s, s)
-	require.NoError(t, r.Scan(&a, &b))
-	require.Equal(t, "[1]", a)
-	require.Equal(t, "[1]", b)
+	var sa, sb string
+	require.NoError(t, r.Scan(&sa, &sb))
+	require.Equal(t, "[1]", sa)
+	require.Equal(t, "[1]", sb)
 
 	// Type without a fallback.
 	r = db.QueryRow(`SELECT a.strA FROM (VALUES (?),(?)) t(a)`, Union{Tag: "strA", Value: "a"}, Union{Tag: "strB", Value: "b"})
@@ -1582,6 +1579,17 @@ func TestTimestampBinding(t *testing.T) {
 	`
 
 	err = db.QueryRow(boundedQuery, startTime, endTime).Scan(&expectedCount)
+	require.NoError(t, err)
+	require.Equal(t, 13, expectedCount)
+
+	// Test with non-UTC timezone to ensure consistent behavior across Location values.
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+
+	startTimeNY := time.Date(2026, 1, 8, 7, 0, 0, 0, loc) // 7am EST = 12pm UTC
+	endTimeNY := time.Date(2026, 1, 8, 8, 0, 0, 0, loc)   // 8am EST = 1pm UTC
+
+	err = db.QueryRow(boundedQuery, startTimeNY, endTimeNY).Scan(&expectedCount)
 	require.NoError(t, err)
 	require.Equal(t, 13, expectedCount)
 }
