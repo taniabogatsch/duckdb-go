@@ -1554,6 +1554,12 @@ func TestTimestampBinding(t *testing.T) {
 	startTime := time.Date(2026, 1, 8, 12, 0, 0, 0, time.UTC)
 	endTime := time.Date(2026, 1, 8, 13, 0, 0, 0, time.UTC)
 
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+
+	startTimeNY := time.Date(2026, 1, 8, 7, 0, 0, 0, loc)
+	endTimeNY := time.Date(2026, 1, 8, 8, 0, 0, 0, loc)
+
 	// Interpolated query returns 13 rows
 	interpolatedQuery := fmt.Sprintf(`
 		SELECT COUNT(*) FROM generate_series(
@@ -1565,7 +1571,7 @@ func TestTimestampBinding(t *testing.T) {
 
 	var expectedCount int
 
-	err := db.QueryRow(interpolatedQuery).Scan(&expectedCount)
+	err = db.QueryRow(interpolatedQuery).Scan(&expectedCount)
 	require.NoError(t, err)
 	require.Equal(t, 13, expectedCount)
 
@@ -1581,13 +1587,6 @@ func TestTimestampBinding(t *testing.T) {
 	err = db.QueryRow(boundedQuery, startTime, endTime).Scan(&expectedCount)
 	require.NoError(t, err)
 	require.Equal(t, 13, expectedCount)
-
-	// Test with non-UTC timezone to ensure consistent behavior across Location values.
-	loc, err := time.LoadLocation("America/New_York")
-	require.NoError(t, err)
-
-	startTimeNY := time.Date(2026, 1, 8, 7, 0, 0, 0, loc) // 7am EST = 12pm UTC
-	endTimeNY := time.Date(2026, 1, 8, 8, 0, 0, 0, loc)   // 8am EST = 1pm UTC
 
 	err = db.QueryRow(boundedQuery, startTimeNY, endTimeNY).Scan(&expectedCount)
 	require.NoError(t, err)
