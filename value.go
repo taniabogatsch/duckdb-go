@@ -123,12 +123,18 @@ func createPrimitiveValue(t mapping.Type, v any) (mapping.Value, error) {
 		return mapping.CreateDouble(v.(float64)), nil
 	case TYPE_VARCHAR:
 		return mapping.CreateVarchar(v.(string)), nil
-	case TYPE_TIMESTAMP, TYPE_TIMESTAMP_TZ:
+	case TYPE_TIMESTAMP:
 		vv, err := inferTimestamp(t, v)
 		if err != nil {
 			return mapping.Value{}, err
 		}
 		return mapping.CreateTimestamp(vv), nil
+	case TYPE_TIMESTAMP_TZ:
+		vv, err := inferTimestamp(t, v)
+		if err != nil {
+			return mapping.Value{}, err
+		}
+		return mapping.CreateTimestampTZ(vv), nil
 	case TYPE_TIMESTAMP_S:
 		vv, err := inferTimestampS(v)
 		if err != nil {
@@ -329,10 +335,9 @@ func inferPrimitiveType(v any) (Type, any) {
 		t = TYPE_VARCHAR
 		v = string(vv)
 	case time.Time:
-		// There is no way to distinguish between
-		// TYPE_DATE, TYPE_TIME, TYPE_TIMESTAMP_S, TYPE_TIMESTAMP_MS, TYPE_TIMESTAMP_NS,
-		// TYPE_TIME_TZ, TYPE_TIMESTAMP_TZ.
-		t = TYPE_TIMESTAMP
+		// Go's time.Time always carries timezone information (via Location),
+		// so TIMESTAMP WITH TIME ZONE is the correct semantic mapping.
+		t = TYPE_TIMESTAMP_TZ
 	case Interval:
 		t = TYPE_INTERVAL
 	case *big.Int:
