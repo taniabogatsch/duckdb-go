@@ -125,21 +125,21 @@ func getEasterEgg(ctx context.Context, values []driver.Value) (any, error) {
 	return strconv.Itoa(int(customBindData)), nil
 }
 
-func bindEasterEgg(ctx context.Context, args []ScalarUDFArg) (context.Context, error) {
+func bindEasterEgg(parentCtx context.Context, args []ScalarUDFArg) (context.Context, error) {
 	if !args[1].Foldable {
 		return nil, errors.New("second argument must be foldable for bindEasterEgg")
 	}
 	if args[1].Value == nil {
-		bindCtx := context.WithValue(ctx, testBindCtxKey, uint64(0))
+		bindCtx := context.WithValue(parentCtx, testBindCtxKey, uint64(0))
 		return bindCtx, nil
 	}
 
 	switch v := args[1].Value.(type) {
 	case int32:
-		bindCtx := context.WithValue(ctx, testBindCtxKey, uint64(v))
+		bindCtx := context.WithValue(parentCtx, testBindCtxKey, uint64(v))
 		return bindCtx, nil
 	case uint64:
-		bindCtx := context.WithValue(ctx, testBindCtxKey, v)
+		bindCtx := context.WithValue(parentCtx, testBindCtxKey, v)
 		return bindCtx, nil
 	default:
 		return nil, errors.New("cannot cast second argument to uint64")
@@ -295,12 +295,12 @@ func (u *siblingUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		// ScalarBinder is called once per expression during query planning.
 		// The context is stored per-connection, but we need to ensure that the second call does not see the first call's state.
-		ScalarBinder: func(ctx context.Context, args []ScalarUDFArg) (context.Context, error) {
+		ScalarBinder: func(parentCtx context.Context, args []ScalarUDFArg) (context.Context, error) {
 			// Get the current counter from the context (default is 0).
-			counter, _ := ctx.Value(counterKeyType{}).(int)
+			counter, _ := parentCtx.Value(counterKeyType{}).(int)
 			counter++
 			// Return an updated context with the new counter.
-			return context.WithValue(ctx, counterKeyType{}, counter), nil
+			return context.WithValue(parentCtx, counterKeyType{}, counter), nil
 		},
 
 		// RowContextExecutor is called for each row during query execution.
