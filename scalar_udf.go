@@ -70,9 +70,9 @@ type (
 	// It takes a context and the row values, and returns the row execution result, or error.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
 	// ChunkContextExecutorFn accepts a chunk-based execution function.
-	// It receives a ScalarFuncChunk providing lazy row-oriented access to inputs
+	// It receives a ScalarUDFChunk providing lazy row-oriented access to inputs
 	// and direct writes to output. The user must call SetResult for each row.
-	ChunkContextExecutorFn func(ctx context.Context, chunk *ScalarFuncChunk) error
+	ChunkContextExecutorFn func(ctx context.Context, chunk *ScalarUDFChunk) error
 	// ScalarBinderFn takes a context and the scalar function's arguments.
 	// It returns the updated context, which can now contain arbitrary data available during execution.
 	ScalarBinderFn func(ctx context.Context, args []ScalarUDFArg) (context.Context, error)
@@ -274,7 +274,7 @@ func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	ctx := funcCtx.ctxStore.load(bindInfo.connId)
 
 	// Create lazy chunk wrapper - no data copied yet.
-	chunk := &ScalarFuncChunk{
+	chunk := &ScalarUDFChunk{
 		input:         inputChunk,
 		output:        outputChunk,
 		nullInNullOut: nullInNullOut,

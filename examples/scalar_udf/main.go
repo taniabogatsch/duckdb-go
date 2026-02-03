@@ -171,28 +171,24 @@ func (*chunkSum) Config() duckdb.ScalarFuncConfig {
 
 func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
 	return duckdb.ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ScalarFuncChunk) error {
-			for row := 0; row < chunk.RowCount(); row++ {
+		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ScalarUDFChunk) error {
+			for row := range chunk.Rows() {
 				// NULL rows are handled automatically by SetResult when
 				// SpecialNullHandling is false (default).
-				if chunk.IsRowNull(row) {
-					if err := chunk.SetResult(row, nil); err != nil {
+				if row.IsNull() {
+					if err := row.SetResult(nil); err != nil {
 						return err
 					}
 					continue
 				}
 
-				a, err := chunk.GetValue(row, 0)
-				if err != nil {
-					return err
-				}
-				b, err := chunk.GetValue(row, 1)
+				values, err := row.Values()
 				if err != nil {
 					return err
 				}
 
-				result := a.(int32) + b.(int32)
-				if err := chunk.SetResult(row, result); err != nil {
+				result := values[0].(int32) + values[1].(int32)
+				if err := row.SetResult(result); err != nil {
 					return err
 				}
 			}

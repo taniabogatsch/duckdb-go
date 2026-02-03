@@ -707,26 +707,22 @@ func (*chunkSumSUDF) Config() ScalarFuncConfig {
 
 func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarFuncChunk) error {
-			for rowIdx := range chunk.RowCount() {
-				if chunk.IsRowNull(rowIdx) {
-					if err := chunk.SetResult(rowIdx, nil); err != nil {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
+			for row, _ := range chunk.Rows() {
+				if row.IsNull() {
+					if err := row.SetResult(nil); err != nil {
 						return err
 					}
 					continue
 				}
 
-				a, err := chunk.GetValue(rowIdx, 0)
-				if err != nil {
-					return err
-				}
-				b, err := chunk.GetValue(rowIdx, 1)
+				values, err := row.Values()
 				if err != nil {
 					return err
 				}
 
-				result := a.(int32) + b.(int32)
-				if err := chunk.SetResult(rowIdx, result); err != nil {
+				result := values[0].(int32) + values[1].(int32)
+				if err := row.SetResult(result); err != nil {
 					return err
 				}
 			}
@@ -741,7 +737,7 @@ func (*chunkContextSUDF) Config() ScalarFuncConfig {
 
 func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarFuncChunk) error {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
 			if ctx == nil {
 				return errors.New("context is nil for chunkContextSUDF")
 			}
@@ -751,8 +747,8 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
 			}
 
-			for rowIdx := range chunk.RowCount() {
-				if err := chunk.SetResult(rowIdx, id); err != nil {
+			for row, _ := range chunk.Rows() {
+				if err := row.SetResult(id); err != nil {
 					return err
 				}
 			}
@@ -768,20 +764,20 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarFuncChunk) error {
-			for rowIdx := range chunk.RowCount() {
-				val, err := chunk.GetValue(rowIdx, 0)
+		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
+			for row, _ := range chunk.Rows() {
+				val, err := row.Value(0)
 				if err != nil {
 					return err
 				}
 
 				// User handles NULL: return -1 for NULL inputs
 				if val == nil {
-					if err := chunk.SetResult(rowIdx, int32(-1)); err != nil {
+					if err := row.SetResult(int32(-1)); err != nil {
 						return err
 					}
 				} else {
-					if err := chunk.SetResult(rowIdx, val.(int32)*2); err != nil {
+					if err := row.SetResult(val.(int32) * 2); err != nil {
 						return err
 					}
 				}
@@ -797,7 +793,7 @@ func (*chunkErrorSUDF) Config() ScalarFuncConfig {
 
 func (*chunkErrorSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarFuncChunk) error {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
 			return errors.New("test chunk execution error")
 		},
 	}
