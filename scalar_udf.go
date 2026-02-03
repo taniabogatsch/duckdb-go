@@ -69,6 +69,10 @@ type (
 	// RowContextExecutorFn accepts a row-based execution function using a context.
 	// It takes a context and the row values, and returns the row execution result, or error.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
+	// ChunkContextExecutorFn accepts a chunk-based execution function.
+	// It receives a ScalarFuncChunk providing lazy row-oriented access to inputs
+	// and direct writes to output. The user must call SetResult for each row.
+	ChunkContextExecutorFn func(ctx context.Context, chunk *ScalarFuncChunk) error
 	// ScalarBinderFn takes a context and the scalar function's arguments.
 	// It returns the updated context, which can now contain arbitrary data available during execution.
 	ScalarBinderFn func(ctx context.Context, args []ScalarUDFArg) (context.Context, error)
@@ -81,6 +85,8 @@ type ScalarFuncExecutor struct {
 	RowExecutor RowExecutorFn
 	// RowContextExecutor accepts a row-based execution function of type RowContextExecutorFn.
 	RowContextExecutor RowContextExecutorFn
+	// ChunkContextExecutor accepts a chunk-based execution function of type ChunkContextExecutorFn.
+	ChunkContextExecutor ChunkContextExecutorFn
 	// Binder accepts a bind function of type ScalarBinderFn.
 	ScalarBinder ScalarBinderFn
 }
@@ -207,6 +213,13 @@ func scalar_udf_callback(functionInfoPtr, inputPtr, outputPtr unsafe.Pointer) {
 	bindDataPtr := mapping.ScalarFunctionGetBindData(functionInfo)
 	pinnedBindData := getPinned[*bindData](bindDataPtr)
 
+	// Check if using chunk executor.
+	executor := funcCtx.f.Executor()
+	if executor.ChunkContextExecutor != nil {
+		executeChunk(funcCtx, pinnedBindData, &inputChunk, &outputChunk, functionInfo, nullInNullOut)
+		return
+	}
+
 	// Prepare the values.
 	length := len(inputChunk.columns)
 	values := make([]driver.Value, length)
@@ -249,6 +262,40 @@ func scalar_udf_callback(functionInfoPtr, inputPtr, outputPtr unsafe.Pointer) {
 				return
 			}
 		}
+	}
+}
+
+// executeChunk handles chunk-based execution of scalar UDFs.
+func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
+	inputChunk, outputChunk *DataChunk,
+	functionInfo mapping.FunctionInfo, nullInNullOut bool) {
+
+	// Get context.
+	ctx := funcCtx.ctxStore.load(bindInfo.connId)
+
+	// Create lazy chunk wrapper - no data copied yet.
+	chunk := &ScalarFuncChunk{
+		input:         inputChunk,
+		output:        outputChunk,
+		nullInNullOut: nullInNullOut,
+	}
+
+	// Pre-scan for nulls if null-in-null-out is enabled.
+	// This is O(rows * cols) but only touches validity masks, not data.
+	if nullInNullOut {
+		chunk.nullRows = make([]bool, chunk.RowCount())
+		for rowIdx := range chunk.RowCount() {
+			if err := chunk.checkRowNulls(rowIdx); err != nil {
+				mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
+				return
+			}
+		}
+	}
+
+	// Execute - user reads input lazily, writes output directly.
+	if err := funcCtx.f.Executor().ChunkContextExecutor(ctx, chunk); err != nil {
+		mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
+		return
 	}
 }
 
@@ -414,7 +461,7 @@ func createScalarFunc(c *sql.Conn, name string, f ScalarFunc) (mapping.ScalarFun
 		return mapping.ScalarFunction{}, errScalarUDFIsNil
 	}
 
-	if f.Executor().RowExecutor == nil && f.Executor().RowContextExecutor == nil {
+	if f.Executor().RowExecutor == nil && f.Executor().RowContextExecutor == nil && f.Executor().ChunkContextExecutor == nil {
 		return mapping.ScalarFunction{}, errScalarUDFNoExecutor
 	}
 

@@ -153,9 +153,93 @@ func wrapSumScalarUDF() {
 	check(db.Close())
 }
 
+// chunkSum demonstrates the ChunkContextExecutor API for batch processing.
+// It computes the sum of two integer columns using chunk-based access.
+// This is more efficient than row-by-row processing for large datasets.
+
+type chunkSum struct{}
+
+func (*chunkSum) Config() duckdb.ScalarFuncConfig {
+	intTypeInfo, err := duckdb.NewTypeInfo(duckdb.TYPE_INTEGER)
+	check(err)
+
+	return duckdb.ScalarFuncConfig{
+		InputTypeInfos: []duckdb.TypeInfo{intTypeInfo, intTypeInfo},
+		ResultTypeInfo: intTypeInfo,
+	}
+}
+
+func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
+	return duckdb.ScalarFuncExecutor{
+		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ScalarFuncChunk) error {
+			for row := 0; row < chunk.RowCount(); row++ {
+				// NULL rows are handled automatically by SetResult when
+				// SpecialNullHandling is false (default).
+				if chunk.IsRowNull(row) {
+					if err := chunk.SetResult(row, nil); err != nil {
+						return err
+					}
+					continue
+				}
+
+				a, err := chunk.GetValue(row, 0)
+				if err != nil {
+					return err
+				}
+				b, err := chunk.GetValue(row, 1)
+				if err != nil {
+					return err
+				}
+
+				result := a.(int32) + b.(int32)
+				if err := chunk.SetResult(row, result); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+}
+
+func chunkSumScalarUDF() {
+	db, err := sql.Open("duckdb", "?access_mode=READ_WRITE")
+	check(err)
+
+	c, err := db.Conn(context.Background())
+	check(err)
+
+	var chunkUDF *chunkSum
+	err = duckdb.RegisterScalarUDF(c, "chunk_sum", chunkUDF)
+	check(err)
+
+	// Test with multiple rows to demonstrate chunk processing.
+	_, err = db.Exec(`CREATE TABLE test_chunk AS SELECT i::INTEGER AS a, (i * 2)::INTEGER AS b FROM range(100) t(i)`)
+	check(err)
+
+	rows, err := db.Query(`SELECT chunk_sum(a, b) FROM test_chunk`)
+	check(err)
+	defer rows.Close()
+
+	count := 0
+	for rows.Next() {
+		var sum int32
+		check(rows.Scan(&sum))
+		count++
+	}
+	if count != 100 {
+		panic(errors.New("incorrect row count"))
+	}
+
+	fmt.Println("chunk_sum processed", count, "rows successfully")
+
+	check(c.Close())
+	check(db.Close())
+}
+
 func main() {
 	myLengthScalarUDFSet()
 	wrapSumScalarUDF()
+	chunkSumScalarUDF()
 }
 
 func check(args ...any) {
