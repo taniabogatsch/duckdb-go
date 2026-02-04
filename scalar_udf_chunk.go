@@ -52,6 +52,9 @@ func (c *ScalarUDFChunk) ColumnCount() int {
 // are automatically skipped and their result is set to NULL. This means your
 // UDF only sees rows with all non-NULL inputs.
 //
+// Note: row.Args is reused across iterations for efficiency. Do not store
+// references to Args beyond the current iteration - copy values if needed.
+//
 // Example:
 //
 //	for row, rowIdx := range chunk.Rows() {
@@ -62,10 +65,10 @@ func (c *ScalarUDFChunk) ColumnCount() int {
 func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
 	return func(yield func(*ScalarUDFRow, int) bool) {
 		colCount := c.ColumnCount()
+		// Reuse args slice across iterations to reduce allocations.
+		args := make([]driver.Value, colCount)
 
 		for rowIdx := range c.RowCount() {
-			// Pre-fetch all values for this row
-			args := make([]driver.Value, colCount)
 			hasNull := false
 
 			for colIdx := range colCount {
@@ -78,7 +81,7 @@ func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
 				}
 				args[colIdx] = val
 
-				if c.nullInNullOut && val == nil {
+				if val == nil {
 					hasNull = true
 				}
 			}
