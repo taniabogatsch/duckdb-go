@@ -52,7 +52,8 @@ type ScalarFuncConfig struct {
 // bindData holds bind data accessible during execution.
 type bindData struct {
 	connId uint64
-	ctx    context.Context
+	// We ignore the linter because we need to pass the context through C memory.
+	ctx context.Context //nolint:containedctx
 }
 
 // ScalarUDFArg contains scalar UDF argument metadata and the optional argument.
