@@ -709,19 +709,9 @@ func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
 			for row, _ := range chunk.Rows() {
-				if row.IsNull() {
-					if err := row.SetResult(nil); err != nil {
-						return err
-					}
-					continue
-				}
-
-				values, err := row.Values()
-				if err != nil {
-					return err
-				}
-
-				result := values[0].(int32) + values[1].(int32)
+				// row.Args contains pre-fetched values
+				// NULL rows are automatically skipped when nullInNullOut is enabled
+				result := row.Args[0].(int32) + row.Args[1].(int32)
 				if err := row.SetResult(result); err != nil {
 					return err
 				}
@@ -766,10 +756,9 @@ func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
 			for row, _ := range chunk.Rows() {
-				val, err := row.Value(0)
-				if err != nil {
-					return err
-				}
+				// With SpecialNullHandling: true, NULL rows are NOT skipped
+				// User must handle NULLs manually via row.Args
+				val := row.Args[0]
 
 				// User handles NULL: return -1 for NULL inputs
 				if val == nil {

@@ -273,26 +273,16 @@ func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	// Get context.
 	ctx := funcCtx.ctxStore.load(bindInfo.connId)
 
-	// Create lazy chunk wrapper - no data copied yet.
+	// Create chunk wrapper.
+	// When nullInNullOut is enabled, the Rows() iterator automatically skips
+	// rows with NULL inputs and sets their result to NULL.
 	chunk := &ScalarUDFChunk{
 		input:         inputChunk,
 		output:        outputChunk,
 		nullInNullOut: nullInNullOut,
 	}
 
-	// Pre-scan for nulls if null-in-null-out is enabled.
-	// This is O(rows * cols) but only touches validity masks, not data.
-	if nullInNullOut {
-		chunk.nullRows = make([]bool, chunk.RowCount())
-		for rowIdx := range chunk.RowCount() {
-			if err := chunk.checkRowNulls(rowIdx); err != nil {
-				mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
-				return
-			}
-		}
-	}
-
-	// Execute - user reads input lazily, writes output directly.
+	// Execute - user iterates over rows, each row has pre-fetched Args.
 	if err := funcCtx.f.Executor().ChunkContextExecutor(ctx, chunk); err != nil {
 		mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
 		return
