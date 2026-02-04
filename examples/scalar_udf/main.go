@@ -172,7 +172,7 @@ func (*chunkSum) Config() duckdb.ScalarFuncConfig {
 func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
 	return duckdb.ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ScalarUDFChunk) error {
-			for row, _ := range chunk.Rows() {
+			for row := range chunk.Rows() {
 				// row.Args contains pre-fetched input values.
 				// NULL rows are automatically skipped and their result set to NULL
 				// (when SpecialNullHandling is false, which is the default).
@@ -203,7 +203,10 @@ func chunkSumScalarUDF() {
 
 	rows, err := db.Query(`SELECT chunk_sum(a, b) FROM test_chunk`)
 	check(err)
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		check(err)
+	}()
 
 	count := 0
 	for rows.Next() {

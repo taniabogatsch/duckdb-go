@@ -708,7 +708,7 @@ func (*chunkSumSUDF) Config() ScalarFuncConfig {
 func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			for row, _ := range chunk.Rows() {
+			for row := range chunk.Rows() {
 				// row.Args contains pre-fetched values
 				// NULL rows are automatically skipped when nullInNullOut is enabled
 				result := row.Args[0].(int32) + row.Args[1].(int32)
@@ -737,7 +737,7 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
 			}
 
-			for row, _ := range chunk.Rows() {
+			for row := range chunk.Rows() {
 				if err := row.SetResult(id); err != nil {
 					return err
 				}
@@ -755,7 +755,7 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			for row, _ := range chunk.Rows() {
+			for row := range chunk.Rows() {
 				// With SpecialNullHandling: true, NULL rows are NOT skipped
 				// User must handle NULLs manually via row.Args
 				val := row.Args[0]
@@ -809,7 +809,7 @@ func TestChunkScalarUDF(t *testing.T) {
 
 	rows, err := db.Query(`SELECT a, b, chunk_sum(a, b) AS sum FROM test_chunk`)
 	require.NoError(t, err)
-	defer rows.Close()
+	defer closeRowsWrapper(t, rows)
 
 	count := 0
 	for rows.Next() {

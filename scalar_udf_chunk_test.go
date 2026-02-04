@@ -142,7 +142,7 @@ func TestScalarUDFChunk_Rows_EarlyBreak(t *testing.T) {
 
 	// Test early break
 	count := 0
-	for _, _ = range chunk.Rows() {
+	for range chunk.Rows() {
 		count++
 		if count == 2 {
 			break
@@ -204,7 +204,7 @@ func TestScalarUDFChunk_Rows_NullInNullOut_Disabled(t *testing.T) {
 
 	// All rows should be yielded
 	count := 0
-	for _, _ = range chunk.Rows() {
+	for range chunk.Rows() {
 		count++
 	}
 
@@ -247,7 +247,7 @@ func TestScalarUDFRow_SetResultError(t *testing.T) {
 		output: output,
 	}
 
-	for row, _ := range chunk.Rows() {
+	for row := range chunk.Rows() {
 		err := row.SetResult(42)
 		require.ErrorIs(t, err, expectedErr)
 	}
@@ -282,7 +282,7 @@ func TestScalarUDFChunk_EmptyChunk(t *testing.T) {
 
 	// Iteration should work but yield nothing
 	count := 0
-	for _, _ = range chunk.Rows() {
+	for range chunk.Rows() {
 		count++
 	}
 	require.Equal(t, 0, count)
@@ -307,7 +307,7 @@ func TestScalarUDFChunk_Integration(t *testing.T) {
 	}
 
 	// Execute UDF - only non-null rows are yielded
-	for row, _ := range chunk.Rows() {
+	for row := range chunk.Rows() {
 		result := row.Args[0].(int32) + row.Args[1].(int32)
 		err := row.SetResult(result)
 		require.NoError(t, err)
@@ -332,7 +332,7 @@ func TestScalarUDFChunk_Args_TypePreservation(t *testing.T) {
 		output: newMockChunkWriter(),
 	}
 
-	for row, _ := range chunk.Rows() {
+	for row := range chunk.Rows() {
 		require.Equal(t, int32(1), row.Args[0])
 		require.Equal(t, "hello", row.Args[1])
 		require.Equal(t, 3.14, row.Args[2])
@@ -355,7 +355,7 @@ func TestScalarUDFChunk_NullInNullOut_AllNullRow(t *testing.T) {
 	}
 
 	count := 0
-	for _, _ = range chunk.Rows() {
+	for range chunk.Rows() {
 		count++
 	}
 

@@ -268,8 +268,8 @@ func scalar_udf_callback(functionInfoPtr, inputPtr, outputPtr unsafe.Pointer) {
 // executeChunk handles chunk-based execution of scalar UDFs.
 func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	inputChunk, outputChunk *DataChunk,
-	functionInfo mapping.FunctionInfo, nullInNullOut bool) {
-
+	functionInfo mapping.FunctionInfo, nullInNullOut bool,
+) {
 	// Get context.
 	ctx := funcCtx.ctxStore.load(bindInfo.connId)
 
