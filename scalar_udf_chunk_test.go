@@ -211,6 +211,35 @@ func TestScalarUDFChunk_Rows_NullInNullOut_Disabled(t *testing.T) {
 	require.Equal(t, 4, count)
 }
 
+func TestScalarUDFChunk_Rows_NullInNullOut_SetValueErrorStopsIteration(t *testing.T) {
+	// When nullInNullOut is true, NULL rows are skipped and we call output.SetValue(0, rowIdx, nil).
+	// If that SetValue fails, we stop iterating and surface the error from onFinish().
+	setErr := errors.New("set null error")
+	input := newMockChunk([][]any{
+		{nil, int32(20)}, // has null - we try to set result to NULL, then SetValue fails
+		{int32(2), int32(20)},
+	})
+	output := &mockChunk{
+		results:  make(map[int]any),
+		errOnSet: setErr,
+	}
+
+	chunk := &ScalarUDFChunk{
+		input:         input,
+		output:        output,
+		nullInNullOut: true,
+	}
+
+	rows, onFinish := chunk.Rows()
+	count := 0
+	for range rows {
+		count++
+	}
+	// First row has NULL; we try to SetValue(0, 0, nil), it fails, we stop before yielding any row
+	require.Equal(t, 0, count)
+	require.ErrorIs(t, onFinish(), setErr)
+}
+
 func TestScalarUDFRow_SetResult(t *testing.T) {
 	input := newMockChunk([][]any{{1}, {2}, {3}})
 	output := newMockChunkWriter()
