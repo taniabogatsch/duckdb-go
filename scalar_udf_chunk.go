@@ -5,24 +5,18 @@ import (
 	"iter"
 )
 
-// chunkReader is the interface for reading from a data chunk.
-type chunkReader interface {
+// chunk is the interface for reading from and writing to a DataChunk
+type chunk interface {
 	GetSize() int
 	ColumnCount() int
 	GetValue(colIdx, rowIdx int) (any, error)
-}
-
-// chunkWriter is the interface for writing to a data chunk.
-type chunkWriter interface {
 	SetValue(colIdx, rowIdx int, val any) error
 }
 
-// ScalarUDFChunk provides lazy, row-oriented access to UDF input/output.
-// Values are read on-demand from the underlying DuckDB vectors - no pre-materialization.
-// Results are written directly to the output vector - no intermediate storage.
+// ScalarUDFChunk provides row-oriented access to UDF input/output
 type ScalarUDFChunk struct {
-	input         chunkReader
-	output        chunkWriter
+	input         chunk
+	output        chunk
 	nullInNullOut bool
 }
 
@@ -31,7 +25,7 @@ type ScalarUDFChunk struct {
 type ScalarUDFRow struct {
 	chunk  *ScalarUDFChunk
 	rowIdx int
-	// Args contains the pre-fetched input values for this row.
+	// Args contains the User Defined Function arguments for this row
 	Args []driver.Value
 }
 
@@ -45,8 +39,9 @@ func (c *ScalarUDFChunk) ColumnCount() int {
 	return c.input.ColumnCount()
 }
 
-// Rows returns an iterator over all rows in the chunk.
-// Each iteration yields a ScalarUDFRow and its index.
+// Rows returns an iterator over all rows in the chunk and an onFinish callback.
+// The iterator yields *ScalarUDFRow; the callback must be invoked after iteration
+// to report any error that occurred during iteration (e.g. from reading input).
 //
 // When nullInNullOut is enabled (the default), rows containing any NULL input
 // are automatically skipped and their result is set to NULL. This means your
@@ -57,13 +52,17 @@ func (c *ScalarUDFChunk) ColumnCount() int {
 //
 // Example:
 //
-//	for row, rowIdx := range chunk.Rows() {
-//	    // row.Args contains the pre-fetched input values
+//	rows, onFinish := chunk.Rows()
+//	for row := range rows {
 //	    result := row.Args[0].(int32) + row.Args[1].(int32)
-//	    row.SetResult(result)
+//	    if err := row.SetResult(result); err != nil {
+//	        return err
+//	    }
 //	}
-func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
-	return func(yield func(*ScalarUDFRow, int) bool) {
+//	return onFinish()
+func (c *ScalarUDFChunk) Rows() (iter.Seq[*ScalarUDFRow], func() error) {
+	var iterErr error
+	seq := func(yield func(*ScalarUDFRow) bool) {
 		colCount := c.ColumnCount()
 		// Reuse args slice across iterations to reduce allocations.
 		args := make([]driver.Value, colCount)
@@ -74,10 +73,8 @@ func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
 			for colIdx := range colCount {
 				val, err := c.input.GetValue(colIdx, rowIdx)
 				if err != nil {
-					// On error, we can't continue - but iterators can't return errors.
-					// The error will surface when the user tries to use the row.
-					// For now, yield the row with what we have.
-					break
+					iterErr = err
+					return
 				}
 				args[colIdx] = val
 
@@ -88,7 +85,11 @@ func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
 
 			// If nullInNullOut and row has NULL, auto-set result to NULL and skip
 			if c.nullInNullOut && hasNull {
-				_ = c.output.SetValue(0, rowIdx, nil)
+				iterErr = c.output.SetValue(0, rowIdx, nil)
+				if iterErr != nil {
+					// if we could not set a return value, stop iterating and surface the error
+					return
+				}
 				continue
 			}
 
@@ -98,11 +99,16 @@ func (c *ScalarUDFChunk) Rows() iter.Seq2[*ScalarUDFRow, int] {
 				Args:   args,
 			}
 
-			if !yield(row, rowIdx) {
+			wantNext := yield(row)
+			if !wantNext {
 				return
 			}
 		}
 	}
+	onFinish := func() error {
+		return iterErr
+	}
+	return seq, onFinish
 }
 
 // SetResult writes the result value for this row directly to the output vector.

@@ -7,24 +7,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockChunkReader is a mock implementation of chunkReader for testing.
-type mockChunkReader struct {
+// mockChunk is a mock implementation of chunk for testing.
+type mockChunk struct {
 	rows     [][]any
+	results  map[int]any
 	errOnGet error
+	errOnSet error
 }
 
-func (m *mockChunkReader) GetSize() int {
+func newMockChunk(rows [][]any) *mockChunk {
+	return &mockChunk{
+		rows:    rows,
+		results: make(map[int]any),
+	}
+}
+
+func newMockChunkWriter() *mockChunk {
+	return &mockChunk{results: make(map[int]any)}
+}
+
+func (m *mockChunk) GetSize() int {
 	return len(m.rows)
 }
 
-func (m *mockChunkReader) ColumnCount() int {
+func (m *mockChunk) ColumnCount() int {
 	if len(m.rows) == 0 {
 		return 0
 	}
 	return len(m.rows[0])
 }
 
-func (m *mockChunkReader) GetValue(colIdx, rowIdx int) (any, error) {
+func (m *mockChunk) GetValue(colIdx, rowIdx int) (any, error) {
 	if m.errOnGet != nil {
 		return nil, m.errOnGet
 	}
@@ -37,19 +50,12 @@ func (m *mockChunkReader) GetValue(colIdx, rowIdx int) (any, error) {
 	return m.rows[rowIdx][colIdx], nil
 }
 
-// mockChunkWriter is a mock implementation of chunkWriter for testing.
-type mockChunkWriter struct {
-	results  map[int]any
-	errOnSet error
-}
-
-func newMockChunkWriter() *mockChunkWriter {
-	return &mockChunkWriter{results: make(map[int]any)}
-}
-
-func (m *mockChunkWriter) SetValue(colIdx, rowIdx int, val any) error {
+func (m *mockChunk) SetValue(colIdx, rowIdx int, val any) error {
 	if m.errOnSet != nil {
 		return m.errOnSet
+	}
+	if m.results == nil {
+		m.results = make(map[int]any)
 	}
 	m.results[rowIdx] = val
 	return nil
@@ -69,7 +75,8 @@ func TestScalarUDFChunk_RowCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			chunk := &ScalarUDFChunk{
-				input: &mockChunkReader{rows: tt.rows},
+				input:  newMockChunk(tt.rows),
+				output: newMockChunkWriter(),
 			}
 			require.Equal(t, tt.expected, chunk.RowCount())
 		})
@@ -91,7 +98,8 @@ func TestScalarUDFChunk_ColumnCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			chunk := &ScalarUDFChunk{
-				input: &mockChunkReader{rows: tt.rows},
+				input:  newMockChunk(tt.rows),
+				output: newMockChunkWriter(),
 			}
 			require.Equal(t, tt.expected, chunk.ColumnCount())
 		})
@@ -99,13 +107,11 @@ func TestScalarUDFChunk_ColumnCount(t *testing.T) {
 }
 
 func TestScalarUDFChunk_Rows_Basic(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1), int32(10)},
-			{int32(2), int32(20)},
-			{int32(3), int32(30)},
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1), int32(10)},
+		{int32(2), int32(20)},
+		{int32(3), int32(30)},
+	})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -113,53 +119,50 @@ func TestScalarUDFChunk_Rows_Basic(t *testing.T) {
 		output: output,
 	}
 
-	// Test iteration and Args
+	rows, onFinish := chunk.Rows()
 	count := 0
-	for row, idx := range chunk.Rows() {
-		require.Equal(t, count, idx)
+	for row := range rows {
 		require.Equal(t, count, row.Index())
 		require.Len(t, row.Args, 2)
-		require.Equal(t, input.rows[idx][0], row.Args[0])
-		require.Equal(t, input.rows[idx][1], row.Args[1])
+		require.Equal(t, input.rows[count][0], row.Args[0])
+		require.Equal(t, input.rows[count][1], row.Args[1])
 		count++
 	}
+	require.NoError(t, onFinish())
 	require.Equal(t, 3, count)
 }
 
 func TestScalarUDFChunk_Rows_EarlyBreak(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1)},
-			{int32(2)},
-			{int32(3)},
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1)},
+		{int32(2)},
+		{int32(3)},
+	})
 
 	chunk := &ScalarUDFChunk{
 		input:  input,
 		output: newMockChunkWriter(),
 	}
 
-	// Test early break
+	rows, onFinish := chunk.Rows()
 	count := 0
-	for range chunk.Rows() {
+	for range rows {
 		count++
 		if count == 2 {
 			break
 		}
 	}
+	require.NoError(t, onFinish())
 	require.Equal(t, 2, count)
 }
 
 func TestScalarUDFChunk_Rows_NullInNullOut_SkipsNullRows(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1), int32(10)}, // no nulls - should be yielded
-			{nil, int32(20)},      // has null - should be skipped
-			{int32(3), nil},       // has null - should be skipped
-			{int32(4), int32(40)}, // no nulls - should be yielded
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1), int32(10)}, // no nulls - should be yielded
+		{nil, int32(20)},     // has null - should be skipped
+		{int32(3), nil},      // has null - should be skipped
+		{int32(4), int32(40)}, // no nulls - should be yielded
+	})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -168,16 +171,15 @@ func TestScalarUDFChunk_Rows_NullInNullOut_SkipsNullRows(t *testing.T) {
 		nullInNullOut: true,
 	}
 
-	// Only rows 0 and 3 should be yielded
+	rows, onFinish := chunk.Rows()
 	yieldedIndices := []int{}
-	for row, idx := range chunk.Rows() {
-		yieldedIndices = append(yieldedIndices, idx)
-		// Verify Args don't contain nil
+	for row := range rows {
+		yieldedIndices = append(yieldedIndices, row.Index())
 		for _, arg := range row.Args {
 			require.NotNil(t, arg)
 		}
 	}
-
+	require.NoError(t, onFinish())
 	require.Equal(t, []int{0, 3}, yieldedIndices)
 
 	// Verify NULL was set for skipped rows
@@ -186,14 +188,12 @@ func TestScalarUDFChunk_Rows_NullInNullOut_SkipsNullRows(t *testing.T) {
 }
 
 func TestScalarUDFChunk_Rows_NullInNullOut_Disabled(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1), int32(10)},
-			{nil, int32(20)}, // has null but should still be yielded
-			{int32(3), nil},  // has null but should still be yielded
-			{int32(4), int32(40)},
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1), int32(10)},
+		{nil, int32(20)},    // has null but should still be yielded
+		{int32(3), nil},     // has null but should still be yielded
+		{int32(4), int32(40)},
+	})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -202,19 +202,17 @@ func TestScalarUDFChunk_Rows_NullInNullOut_Disabled(t *testing.T) {
 		nullInNullOut: false, // disabled
 	}
 
-	// All rows should be yielded
+	rows, onFinish := chunk.Rows()
 	count := 0
-	for range chunk.Rows() {
+	for range rows {
 		count++
 	}
-
+	require.NoError(t, onFinish())
 	require.Equal(t, 4, count)
 }
 
 func TestScalarUDFRow_SetResult(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{{1}, {2}, {3}},
-	}
+	input := newMockChunk([][]any{{1}, {2}, {3}})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -222,10 +220,12 @@ func TestScalarUDFRow_SetResult(t *testing.T) {
 		output: output,
 	}
 
-	for row, idx := range chunk.Rows() {
-		err := row.SetResult(idx * 10)
+	rows, onFinish := chunk.Rows()
+	for row := range rows {
+		err := row.SetResult(row.Index() * 10)
 		require.NoError(t, err)
 	}
+	require.NoError(t, onFinish())
 
 	require.Equal(t, 0, output.results[0])
 	require.Equal(t, 10, output.results[1])
@@ -234,10 +234,8 @@ func TestScalarUDFRow_SetResult(t *testing.T) {
 
 func TestScalarUDFRow_SetResultError(t *testing.T) {
 	expectedErr := errors.New("write error")
-	input := &mockChunkReader{
-		rows: [][]any{{1}},
-	}
-	output := &mockChunkWriter{
+	input := newMockChunk([][]any{{1}})
+	output := &mockChunk{
 		results:  make(map[int]any),
 		errOnSet: expectedErr,
 	}
@@ -247,29 +245,54 @@ func TestScalarUDFRow_SetResultError(t *testing.T) {
 		output: output,
 	}
 
-	for row := range chunk.Rows() {
+	rows, onFinish := chunk.Rows()
+	for row := range rows {
 		err := row.SetResult(42)
 		require.ErrorIs(t, err, expectedErr)
 	}
+	require.NoError(t, onFinish())
+}
+
+func TestScalarUDFChunk_Rows_OnFinishReturnsIterationError(t *testing.T) {
+	getErr := errors.New("get value error")
+	input := &mockChunk{
+		rows:     [][]any{{1}, {2}, {3}},
+		errOnGet: getErr,
+	}
+	chunk := &ScalarUDFChunk{
+		input:  input,
+		output: newMockChunkWriter(),
+	}
+
+	rows, onFinish := chunk.Rows()
+	count := 0
+	for range rows {
+		count++
+	}
+	// GetValue fails on first row, so no rows are yielded
+	require.Equal(t, 0, count)
+	require.ErrorIs(t, onFinish(), getErr)
 }
 
 func TestScalarUDFRow_Index(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{{1}, {2}, {3}, {4}, {5}},
-	}
+	input := newMockChunk([][]any{{1}, {2}, {3}, {4}, {5}})
 
 	chunk := &ScalarUDFChunk{
 		input:  input,
 		output: newMockChunkWriter(),
 	}
 
-	for row, idx := range chunk.Rows() {
-		require.Equal(t, idx, row.Index())
+	rows, onFinish := chunk.Rows()
+	var indices []int
+	for row := range rows {
+		indices = append(indices, row.Index())
 	}
+	require.NoError(t, onFinish())
+	require.Equal(t, []int{0, 1, 2, 3, 4}, indices)
 }
 
 func TestScalarUDFChunk_EmptyChunk(t *testing.T) {
-	input := &mockChunkReader{rows: [][]any{}}
+	input := newMockChunk([][]any{})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -280,24 +303,23 @@ func TestScalarUDFChunk_EmptyChunk(t *testing.T) {
 	require.Equal(t, 0, chunk.RowCount())
 	require.Equal(t, 0, chunk.ColumnCount())
 
-	// Iteration should work but yield nothing
+	rows, onFinish := chunk.Rows()
 	count := 0
-	for range chunk.Rows() {
+	for range rows {
 		count++
 	}
+	require.NoError(t, onFinish())
 	require.Equal(t, 0, count)
 }
 
 func TestScalarUDFChunk_Integration(t *testing.T) {
 	// Simulate a typical UDF execution pattern
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1), int32(10)},
-			{int32(2), int32(20)},
-			{nil, int32(30)}, // null in first column - should be skipped
-			{int32(4), int32(40)},
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1), int32(10)},
+		{int32(2), int32(20)},
+		{nil, int32(30)}, // null in first column - should be skipped
+		{int32(4), int32(40)},
+	})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -306,12 +328,13 @@ func TestScalarUDFChunk_Integration(t *testing.T) {
 		nullInNullOut: true,
 	}
 
-	// Execute UDF - only non-null rows are yielded
-	for row := range chunk.Rows() {
+	rows, onFinish := chunk.Rows()
+	for row := range rows {
 		result := row.Args[0].(int32) + row.Args[1].(int32)
 		err := row.SetResult(result)
 		require.NoError(t, err)
 	}
+	require.NoError(t, onFinish())
 
 	// Verify results
 	require.Equal(t, int32(11), output.results[0])
@@ -321,31 +344,29 @@ func TestScalarUDFChunk_Integration(t *testing.T) {
 }
 
 func TestScalarUDFChunk_Args_TypePreservation(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{int32(1), "hello", 3.14, true},
-		},
-	}
+	input := newMockChunk([][]any{
+		{int32(1), "hello", 3.14, true},
+	})
 
 	chunk := &ScalarUDFChunk{
 		input:  input,
 		output: newMockChunkWriter(),
 	}
 
-	for row := range chunk.Rows() {
+	rows, onFinish := chunk.Rows()
+	for row := range rows {
 		require.Equal(t, int32(1), row.Args[0])
 		require.Equal(t, "hello", row.Args[1])
 		require.Equal(t, 3.14, row.Args[2])
 		require.Equal(t, true, row.Args[3])
 	}
+	require.NoError(t, onFinish())
 }
 
 func TestScalarUDFChunk_NullInNullOut_AllNullRow(t *testing.T) {
-	input := &mockChunkReader{
-		rows: [][]any{
-			{nil, nil}, // all nulls
-		},
-	}
+	input := newMockChunk([][]any{
+		{nil, nil}, // all nulls
+	})
 	output := newMockChunkWriter()
 
 	chunk := &ScalarUDFChunk{
@@ -354,11 +375,12 @@ func TestScalarUDFChunk_NullInNullOut_AllNullRow(t *testing.T) {
 		nullInNullOut: true,
 	}
 
+	rows, onFinish := chunk.Rows()
 	count := 0
-	for range chunk.Rows() {
+	for range rows {
 		count++
 	}
-
+	require.NoError(t, onFinish())
 	require.Equal(t, 0, count)        // Row should be skipped
 	require.Nil(t, output.results[0]) // Result should be NULL
 }

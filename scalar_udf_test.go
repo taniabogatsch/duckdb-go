@@ -708,15 +708,14 @@ func (*chunkSumSUDF) Config() ScalarFuncConfig {
 func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			for row := range chunk.Rows() {
-				// row.Args contains pre-fetched values
-				// NULL rows are automatically skipped when nullInNullOut is enabled
+			rows, onFinish := chunk.Rows()
+			for row := range rows {
 				result := row.Args[0].(int32) + row.Args[1].(int32)
 				if err := row.SetResult(result); err != nil {
 					return err
 				}
 			}
-			return nil
+			return onFinish()
 		},
 	}
 }
@@ -737,12 +736,13 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
 			}
 
-			for row := range chunk.Rows() {
+			rows, onFinish := chunk.Rows()
+			for row := range rows {
 				if err := row.SetResult(id); err != nil {
 					return err
 				}
 			}
-			return nil
+			return onFinish()
 		},
 	}
 }
@@ -755,12 +755,9 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			for row := range chunk.Rows() {
-				// With SpecialNullHandling: true, NULL rows are NOT skipped
-				// User must handle NULLs manually via row.Args
+			rows, onFinish := chunk.Rows()
+			for row := range rows {
 				val := row.Args[0]
-
-				// User handles NULL: return -1 for NULL inputs
 				if val == nil {
 					if err := row.SetResult(int32(-1)); err != nil {
 						return err
@@ -771,7 +768,7 @@ func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 					}
 				}
 			}
-			return nil
+			return onFinish()
 		},
 	}
 }

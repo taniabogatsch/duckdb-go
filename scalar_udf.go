@@ -70,8 +70,8 @@ type (
 	// It takes a context and the row values, and returns the row execution result, or error.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
 	// ChunkContextExecutorFn accepts a chunk-based execution function.
-	// It receives a ScalarUDFChunk providing lazy row-oriented access to inputs
-	// and direct writes to output. The user must call SetResult for each row.
+	// It receives a ScalarUDFChunk providing row-oriented access to inputs
+	// and direct writes to output. The user must call row.SetResult for each row.
 	ChunkContextExecutorFn func(ctx context.Context, chunk *ScalarUDFChunk) error
 	// ScalarBinderFn takes a context and the scalar function's arguments.
 	// It returns the updated context, which can now contain arbitrary data available during execution.
