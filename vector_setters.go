@@ -220,7 +220,7 @@ func setBignum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 func setBytes[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	switch v := any(val).(type) {
 	case string:
-		mapping.VectorAssignStringElement(vec.vec, rowIdx, v)
+		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, []byte(v))
 	case []byte:
 		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, v)
 	default:
