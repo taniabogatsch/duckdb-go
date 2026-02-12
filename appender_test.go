@@ -1369,7 +1369,7 @@ func TestAppenderInterrupt(t *testing.T) {
 				}()
 
 				// Interrupt it.
-				time.Sleep(1 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				go func() {
 					cancel()
 				}()
@@ -1383,7 +1383,7 @@ func TestAppenderInterrupt(t *testing.T) {
 				}()
 
 				// Interrupt it.
-				time.Sleep(1 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				go func() {
 					cancel()
 				}()
@@ -1399,7 +1399,7 @@ func TestAppenderInterrupt(t *testing.T) {
 				}()
 
 				// Interrupt it.
-				time.Sleep(1 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				go func() {
 					cancel()
 				}()
