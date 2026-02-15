@@ -407,13 +407,10 @@ func (om OrderedMap) String() string {
 	return sb.String()
 }
 
+// Set adds or updates a key-value pair, always inserting the key to the end of the map.
+// Previous entries with the same key will be removed to ensure only the last value is retained.
 func (om *OrderedMap) Set(k, v any) {
-	for i, key := range om.keys {
-		if key == k {
-			om.values[i] = v
-			return
-		}
-	}
+	om.Delete(k)
 
 	om.keys = append(om.keys, k)
 	om.values = append(om.values, v)
