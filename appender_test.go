@@ -537,8 +537,8 @@ func newAppenderHugeIntFloatTest[T float32 | float64](val T, lower, upper *big.I
 	}
 }
 
-func TestAppenderHugeInt(t *testing.T) {
-	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (val HUGEINT, id VARCHAR)`)
+func testAppenderSignedHugeInt(t *testing.T, sqlType string) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (val `+sqlType+`, id VARCHAR)`)
 	defer cleanupAppender(t, c, db, conn, a)
 
 	tests := map[string]func(t *testing.T){
@@ -563,6 +563,10 @@ func TestAppenderHugeInt(t *testing.T) {
 	}
 }
 
+func TestAppenderHugeInt(t *testing.T) {
+	testAppenderSignedHugeInt(t, "HUGEINT")
+}
+
 func TestAppenderUHugeInt(t *testing.T) {
 	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (val UHUGEINT, id VARCHAR)`)
 	defer cleanupAppender(t, c, db, conn, a)
@@ -582,6 +586,10 @@ func TestAppenderUHugeInt(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, test)
 	}
+}
+
+func TestAppenderBigNum(t *testing.T) {
+	testAppenderSignedHugeInt(t, "BIGNUM")
 }
 
 func TestAppenderTsNs(t *testing.T) {
@@ -748,6 +756,23 @@ func TestAppenderNullUHugeInt(t *testing.T) {
 
 	// Verify results.
 	res := db.QueryRowContext(context.Background(), `SELECT h FROM test`)
+
+	var r *big.Int
+	require.NoError(t, res.Scan(&r))
+	require.Nil(t, r)
+}
+
+func TestAppenderNullBigNum(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (b BIGNUM)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Append a nil *big.Int.
+	var nilBigInt *big.Int
+	require.NoError(t, a.AppendRow(nilBigInt))
+	require.NoError(t, a.Flush())
+
+	// Verify results.
+	res := db.QueryRowContext(context.Background(), `SELECT b FROM test`)
 
 	var r *big.Int
 	require.NoError(t, res.Scan(&r))
@@ -1372,6 +1397,90 @@ func TestNewAppenderWithColumnsSubsetGreaterThanTable(t *testing.T) {
 	defer func() { cleanupDb(t, c, db, conn) }()
 	_, err := NewAppenderWithColumns(conn, "", "", "test", []string{"col_b", "id", "does_not_exist"})
 	require.Error(t, err)
+}
+
+func TestEmbeddedNulls(t *testing.T) {
+	type testCase struct {
+		name     string
+		input    string
+		expected string
+	}
+	// Test cases with embedded null bytes, escape sequences, and control characters.
+	testCases := []testCase{
+		{
+			name:     "UTF-16LE encoded 'Name'",
+			input:    "N\x00a\x00m\x00e\x00",
+			expected: "N\x00a\x00m\x00e\x00",
+		},
+		{
+			name:     "Text with null in middle",
+			input:    "Hello\x00World",
+			expected: "Hello\x00World",
+		},
+		{
+			name:     "Null followed by important data",
+			input:    "A\x00BCDEFG",
+			expected: "A\x00BCDEFG",
+		},
+		{
+			name:     "ESC + null byte in name (Hey Ga\\x1b\\x0081lle)",
+			input:    "Hey Ga\x1b\x0081lle",
+			expected: "Hey Ga\x1b\x0081lle",
+		},
+		{
+			name:     "ESC control char only (no null)",
+			input:    "Hey Ga\x1belle",
+			expected: "Hey Ga\x1belle",
+		},
+		{
+			name:     "Multiple control chars with nulls",
+			input:    "Hello\x1b\x00World\x07\x00Test",
+			expected: "Hello\x1b\x00World\x07\x00Test",
+		},
+		{
+			name:     "Name with accented char as broken encoding (Ga\\xc3\\xab\\x00lle)",
+			input:    "Ga\xc3\xab\x00lle",
+			expected: "Ga\xc3\xab\x00lle",
+		},
+		{
+			name:     "Null between ANSI escape sequences",
+			input:    "\x1b[31m\x00Red\x1b[0m",
+			expected: "\x1b[31m\x00Red\x1b[0m",
+		},
+	}
+
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (id INTEGER, text_value VARCHAR)`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Method 1: Appender API
+
+	for i, tc := range testCases {
+		id := i + 1
+		err := a.AppendRow(driver.Value(id), driver.Value(tc.input))
+		require.NoError(t, err)
+		require.NoError(t, a.Flush())
+
+		var retrieved string
+		err = db.QueryRow("SELECT text_value FROM test WHERE id = ?", id).Scan(&retrieved)
+		require.NoError(t, err)
+		require.Equal(t, tc.expected, retrieved)
+	}
+
+	// Method 2: Parameterized queries (db.Exec with ?)
+
+	_, err := db.Exec("CREATE TABLE test_parameterized (id INTEGER PRIMARY KEY, text_value VARCHAR)")
+	require.NoError(t, err)
+
+	for i, tc := range testCases {
+		id := i + 1
+		_, err = db.Exec("INSERT INTO test_parameterized (id, text_value) VALUES (?, ?)", id, tc.input)
+		require.NoError(t, err)
+
+		var retrieved string
+		err = db.QueryRow("SELECT text_value FROM test_parameterized WHERE id = ?", id).Scan(&retrieved)
+		require.NoError(t, err)
+		require.Equal(t, tc.expected, retrieved)
+	}
 }
 
 func BenchmarkAppenderNested(b *testing.B) {
