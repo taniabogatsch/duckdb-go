@@ -374,6 +374,8 @@ func (m *Map) Scan(v any) error {
 //
 // NOTE: only supports keys of comparable types (no slices, maps, or functions).
 // NOTE: Set and Get use linear search, so performance may degrade with large maps.
+//
+//nolint:recvcheck
 type OrderedMap struct {
 	keys   []any
 	values []any
@@ -391,6 +393,7 @@ func (om *OrderedMap) Len() int {
 	return len(om.keys)
 }
 
+// String implements the fmt.Stringer interface for debugging purposes.
 func (om OrderedMap) String() string {
 	var sb strings.Builder
 	sb.WriteString("OrderedMap{")
@@ -404,7 +407,7 @@ func (om OrderedMap) String() string {
 	return sb.String()
 }
 
-func (om *OrderedMap) Set(k any, v any) {
+func (om *OrderedMap) Set(k, v any) {
 	for i, key := range om.keys {
 		if key == k {
 			om.values[i] = v
