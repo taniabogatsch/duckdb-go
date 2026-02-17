@@ -1291,3 +1291,26 @@ func TestOrderedMap(t *testing.T) {
 	require.Equal(t, orderedMap.Keys(), result.Keys())
 	require.Equal(t, orderedMap.Values(), result.Values())
 }
+
+func TestMap(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	_, err := db.Exec(`CREATE TABLE map_test (data MAP(VARCHAR, INTEGER))`)
+	require.NoError(t, err)
+
+	testMap := Map{
+		"first":  int32(1),
+		"second": int32(2),
+		"third":  int32(3),
+	}
+
+	_, err = db.Exec(`INSERT INTO map_test (data) VALUES (?)`, testMap)
+	require.NoError(t, err)
+
+	var result Map
+	err = db.QueryRow(`SELECT data FROM map_test`).Scan(&result)
+	require.NoError(t, err)
+
+	require.Equal(t, testMap, result)
+}
