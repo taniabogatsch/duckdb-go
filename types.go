@@ -401,7 +401,7 @@ func (om OrderedMap) String() string {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(fmt.Sprintf("%v: %v", key, om.values[i]))
+		fmt.Fprintf(&sb, "%v: %v", key, om.values[i])
 	}
 	sb.WriteString("}")
 	return sb.String()
