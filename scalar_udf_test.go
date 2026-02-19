@@ -762,11 +762,11 @@ func (*chunkSumSUDF) Config() ScalarFuncConfig {
 
 func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			rows, onFinish := chunk.Rows()
-			for row := range rows {
-				result := row.Args[0].(int32) + row.Args[1].(int32)
-				if err := row.SetResult(result); err != nil {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
+			rs, onFinish := chunk.Rows()
+			for row := range rs {
+				res := row.Args[0].(int32) + row.Args[1].(int32)
+				if err := row.SetResult(res); err != nil {
 					return err
 				}
 			}
@@ -781,7 +781,7 @@ func (*chunkContextSUDF) Config() ScalarFuncConfig {
 
 func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
 			if ctx == nil {
 				return errors.New("context is nil for chunkContextSUDF")
 			}
@@ -791,8 +791,8 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
 			}
 
-			rows, onFinish := chunk.Rows()
-			for row := range rows {
+			rs, onFinish := chunk.Rows()
+			for row := range rs {
 				if err := row.SetResult(id); err != nil {
 					return err
 				}
@@ -809,9 +809,9 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
-			rows, onFinish := chunk.Rows()
-			for row := range rows {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
+			rs, onFinish := chunk.Rows()
+			for row := range rs {
 				val := row.Args[0]
 				if val == nil {
 					if err := row.SetResult(int32(-1)); err != nil {
@@ -834,7 +834,7 @@ func (*chunkErrorSUDF) Config() ScalarFuncConfig {
 
 func (*chunkErrorSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *ScalarUDFChunk) error {
+		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
 			return errors.New("test chunk execution error")
 		},
 	}
@@ -859,14 +859,14 @@ func TestChunkScalarUDF(t *testing.T) {
 	_, err = db.Exec(`CREATE TABLE test_chunk AS SELECT i::INTEGER AS a, (i * 2)::INTEGER AS b FROM range(100) t(i)`)
 	require.NoError(t, err)
 
-	rows, err := db.Query(`SELECT a, b, chunk_sum(a, b) AS sum FROM test_chunk`)
+	res, err := db.Query(`SELECT a, b, chunk_sum(a, b) AS sum FROM test_chunk`)
 	require.NoError(t, err)
-	defer closeRowsWrapper(t, rows)
+	defer closeRowsWrapper(t, res)
 
 	count := 0
-	for rows.Next() {
+	for res.Next() {
 		var a, b, sum int32
-		require.NoError(t, rows.Scan(&a, &b, &sum))
+		require.NoError(t, res.Scan(&a, &b, &sum))
 		require.Equal(t, a+b, sum)
 		count++
 	}
@@ -919,14 +919,14 @@ func TestChunkScalarUDFSpecialNullHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test user-managed NULL handling.
-	var result int32
+	var res int32
 	row := db.QueryRow(`SELECT chunk_null_handler(5)`)
-	require.NoError(t, row.Scan(&result))
-	require.Equal(t, int32(10), result)
+	require.NoError(t, row.Scan(&res))
+	require.Equal(t, int32(10), res)
 
 	row = db.QueryRow(`SELECT chunk_null_handler(NULL)`)
-	require.NoError(t, row.Scan(&result))
-	require.Equal(t, int32(-1), result)
+	require.NoError(t, row.Scan(&res))
+	require.Equal(t, int32(-1), res)
 }
 
 func TestChunkScalarUDFContext(t *testing.T) {
@@ -947,10 +947,10 @@ func TestChunkScalarUDFContext(t *testing.T) {
 
 	ctx := context.WithValue(context.Background(), testCtxKey, connId)
 
-	var result uint64
+	var res uint64
 	row := conn.QueryRowContext(ctx, `SELECT chunk_get_conn_id()`)
-	require.NoError(t, row.Scan(&result))
-	require.Equal(t, connId, result)
+	require.NoError(t, row.Scan(&res))
+	require.Equal(t, connId, res)
 }
 
 func TestChunkScalarUDFError(t *testing.T) {

@@ -71,10 +71,8 @@ type (
 	// RowContextExecutorFn accepts a row-based execution function using a context.
 	// It takes a context and the row values, and returns the row execution result, or error.
 	RowContextExecutorFn func(ctx context.Context, values []driver.Value) (any, error)
-	// ChunkContextExecutorFn accepts a chunk-based execution function.
-	// It receives a ScalarUDFChunk providing row-oriented access to inputs
-	// and direct writes to output. The user must call row.SetResult for each row.
-	ChunkContextExecutorFn func(ctx context.Context, chunk *ScalarUDFChunk) error
+	// ChunkContextExecutorFn TODO comment
+	ChunkContextExecutorFn func(ctx context.Context, chunk *ChunkIteratorState) error
 	// ScalarBinderFn takes a (parent) context and the scalar function's arguments.
 	// It returns the possibly updated child context (can be the same as the parent).
 	// The child context can contain additional arbitrary data available during execution.
@@ -295,9 +293,12 @@ func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	// Create chunk wrapper.
 	// When nullInNullOut is enabled, the Rows() iterator automatically skips
 	// rows with NULL inputs and sets their result to NULL.
-	chunk := &ScalarUDFChunk{
-		input:         inputChunk,
-		output:        outputChunk,
+	chunk := &ChunkIteratorState{
+		r: Row{
+			chunk: inputChunk,
+			r:     mapping.IdxT(0),
+		},
+		output:        &outputChunk.columns[0],
 		nullInNullOut: nullInNullOut,
 	}
 

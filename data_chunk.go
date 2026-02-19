@@ -71,9 +71,7 @@ func (chunk *DataChunk) SetValue(colIdx, rowIdx int, val any) error {
 	}
 
 	column := &chunk.columns[colIdx]
-
-	err = column.setFn(column, mapping.IdxT(rowIdx), val)
-	if err != nil {
+	if err = column.SetValue(rowIdx, val); err != nil {
 		return setValueError(colIdx, rowIdx, val, err)
 	}
 
