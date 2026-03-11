@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -20,8 +21,26 @@ import (
 
 /* ---------- Open and Close Wrappers ---------- */
 
+// addExtensionDirWorkaround works around a DuckDB v1.5.0 regression where the default
+// extension directory is malformed on Windows (https://github.com/duckdb/duckdb/pull/21260).
+// Uses os.MkdirTemp instead of t.TempDir() to avoid Windows cleanup failures when DuckDB
+// still holds extension file handles.
+func addExtensionDirWorkaround[T require.TestingT](t T, dsn string) string {
+	if runtime.GOOS != "windows" {
+		return dsn
+	}
+
+	extDir, err := os.MkdirTemp("", "duckdb-ext-*")
+	require.NoError(t, err)
+
+	if strings.Contains(dsn, "?") {
+		return dsn + "&extension_directory=" + extDir
+	}
+	return dsn + "?extension_directory=" + extDir
+}
+
 func openDbWrapper[T require.TestingT](t T, dsn string) *sql.DB {
-	db, err := sql.Open(`duckdb`, dsn)
+	db, err := sql.Open(`duckdb`, addExtensionDirWorkaround(t, dsn))
 	require.NoError(t, err)
 	require.NoError(t, db.Ping())
 	return db
@@ -35,7 +54,7 @@ func closeDbWrapper[T require.TestingT](t T, db *sql.DB) {
 }
 
 func newConnectorWrapper[T require.TestingT](t T, dsn string, connInitFn func(execer driver.ExecerContext) error) *Connector {
-	c, err := NewConnector(dsn, connInitFn)
+	c, err := NewConnector(addExtensionDirWorkaround(t, dsn), connInitFn)
 	require.NoError(t, err)
 	return c
 }
