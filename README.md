@@ -5,26 +5,30 @@
 
 The DuckDB driver conforms to the built-in `database/sql` interface.
 
-**Current DuckDB version: `v1.4.4`.**
+**Current DuckDB version: `v1.5.0`.**
 
-The first duckdb-go tag with that version is `v2.5.5`.
+The first duckdb-go tag with that version is `v2.10500.0`.
+
+Starting with DuckDB `v1.5.0`, the duckdb-go version encodes the DuckDB version in its major version component.
+The format is `v2.MAJOR_MINOR_PATCH.x`, e.g., DuckDB `v1.5.0` maps to duckdb-go `v2.10500.x`.
 
 Previous DuckDB versions:
 
-| DuckDB   | duckdb-go |
-| -------- | --------- |
-| `v1.4.4` | `v2.5.5`  |
-| `v1.4.3` | `v2.5.4`  |
-| `v1.4.2` | `v2.5.2`  |
-| `v1.4.1` | `v2.4.2`  |
-| `v1.4.0` | `v2.4.0`  |
-| `v1.3.2` | `v2.3.3`  |
-| `v1.3.1` | `v2.3.2`  |
-| `v1.3.0` | `v2.3.0`  |
-| `v1.2.2` | `v2.2.0`  |
-| `v1.2.1` | `v2.1.0`  |
-| `v1.2.0` | `v2.0.3`  |
-| `v1.1.3` | `v1.8.5`  |
+| DuckDB   | duckdb-go    |
+| -------- | ------------ |
+| `v1.5.0` | `v2.10500.0` |
+| `v1.4.4` | `v2.5.5`     |
+| `v1.4.3` | `v2.5.4`     |
+| `v1.4.2` | `v2.5.2`     |
+| `v1.4.1` | `v2.4.2`     |
+| `v1.4.0` | `v2.4.0`     |
+| `v1.3.2` | `v2.3.3`     |
+| `v1.3.1` | `v2.3.2`     |
+| `v1.3.0` | `v2.3.0`     |
+| `v1.2.2` | `v2.2.0`     |
+| `v1.2.1` | `v2.1.0`     |
+| `v1.2.0` | `v2.0.3`     |
+| `v1.1.3` | `v1.8.5`     |
 
 ## Migration from marcboeker/go-duckdb
 
@@ -398,7 +402,7 @@ Additionally, automatic extension loading is enabled.
 ## Releasing a New DuckDB Version
 
 1. Create a new branch.
-2. Update `duckdb-go-bindings` in `go.mod`.
+2. Update `duckdb-go-bindings` via `go get github.com/duckdb/duckdb-go-bindings@latest`.
 3. Run `go mod tidy`.
 4. Update `DUCKDB_VERSION` in `Makefile`.
 5. Update the latest version in `README.md`.
