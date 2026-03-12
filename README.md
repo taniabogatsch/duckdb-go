@@ -9,7 +9,7 @@ The DuckDB driver conforms to the built-in `database/sql` interface.
 
 The first duckdb-go tag with that version is `v2.10500.0`.
 
-Starting with DuckDB `v1.5.0`, the duckdb-go version encodes the DuckDB version in its major version component.
+Starting with DuckDB `v1.5.0`, the duckdb-go version encodes the DuckDB version in its second semver component.
 The format is `v2.MAJOR_MINOR_PATCH.x`, e.g., DuckDB `v1.5.0` maps to duckdb-go `v2.10500.x`.
 
 Previous DuckDB versions:
@@ -93,7 +93,7 @@ If you want to use it, you can enable it by passing `-tags=duckdb_arrow` to `go 
 #### JSON type scanning changes
 
 The pre-built libraries ship DuckDB's JSON extension containing the `JSON` type.
-Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](https://cs.opensource.google/go/go/+/go1.24.1:src/database/sql/sql.go;l=3365).
+Pre-v2, it was possible to scan a JSON type into `[]byte` via [`Rows.Scan`](https://pkg.go.dev/database/sql#Rows.Scan).
 However, scanning into `any` (`driver.Value`) would cause the JSON string to contain escape characters and other unexpected behavior.
 
 It is now possible to scan into `any`, or directly into duckdb-go's `Composite` type,
@@ -120,7 +120,7 @@ pacman -S mingw-w64-ucrt-x86_64-gcc
 
 Select "yes" when necessary; it is okay if the shell closes.
 Then, add gcc to the path using whatever method you prefer.
-In powershell this is `$env:PATH = "C:\msys64\ucrt64\bin:$env:PATH"`.
+In powershell this is `$env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"`.
 After, you can compile this package in Windows.
 
 ### Vendoring
@@ -311,7 +311,7 @@ defer c.Close()
 ## DuckDB Appender API
 
 If you want to use the [DuckDB Appender API](https://duckdb.org/docs/data/appender.html), you can obtain a new `Appender` by passing a DuckDB connection to `NewAppenderFromConn()`.
-See `examples/appender.go` for a complete example.
+See `examples/appender/main.go` for a complete example.
 
 ```go
 c, err := duckdb.NewConnector("test.db", nil)
@@ -407,7 +407,7 @@ Additionally, automatic extension loading is enabled.
 4. Update `DUCKDB_VERSION` in `Makefile`.
 5. Update the latest version in `README.md`.
 6. Commit and PR changes.
-7. Push a new tagged release, `vx.x.x`.
+7. Push a new tagged release, `v2.MAJOR_MINOR_PATCH.x`, e.g. `v2.10500.0` for DuckDB 1.5.0.
 
 ```
 git tag <tagname>
