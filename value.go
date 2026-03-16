@@ -397,7 +397,7 @@ func inferSliceLogicalTypeAndValue[T any](val T, array bool, length int) (mappin
 	}
 
 	values := make([]mapping.Value, 0, length)
-	defer destroyValueSlice(values)
+	defer func() { destroyValueSlice(values) }()
 
 	if len(slice) == 0 {
 		lt := mapping.CreateLogicalType(TYPE_SQLNULL)
@@ -406,7 +406,7 @@ func inferSliceLogicalTypeAndValue[T any](val T, array bool, length int) (mappin
 	}
 
 	logicalTypes := make([]mapping.LogicalType, 0, length)
-	defer destroyLogicalTypes(logicalTypes)
+	defer func() { destroyLogicalTypes(logicalTypes) }()
 
 	var elemLogicalType mapping.LogicalType
 	expectedIndex := -1
@@ -458,7 +458,7 @@ func createSliceValue[T any](lt mapping.LogicalType, t Type, val T) (mapping.Val
 	}
 
 	var values []mapping.Value
-	defer destroyValueSlice(values)
+	defer func() { destroyValueSlice(values) }()
 
 	for _, v := range slice {
 		vv, err := createValue(childType, v)
@@ -486,7 +486,7 @@ func createStructValue(lt mapping.LogicalType, val any) (mapping.Value, error) {
 	}
 
 	var values []mapping.Value
-	defer destroyValueSlice(values)
+	defer func() { destroyValueSlice(values) }()
 
 	childCount := mapping.StructTypeChildCount(lt)
 	for i := range uint64(childCount) {
