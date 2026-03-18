@@ -357,12 +357,14 @@ type Map map[any]any
 func (m *Map) Scan(v any) error {
 	data, ok := v.(OrderedMap)
 	if !ok {
-		return fmt.Errorf("invalid type `%T` for scanning `Map`, expected `OrderedMap`", data)
+		return fmt.Errorf("invalid type `%T` for scanning `Map`, expected `OrderedMap`", v)
 	}
 
 	nm := make(map[any]any, data.Len())
-	for i, key := range data.Keys() {
-		nm[key] = data.Values()[i]
+	keys := data.Keys()
+	vals := data.Values()
+	for i, key := range keys {
+		nm[key] = vals[i]
 	}
 
 	*m = nm
@@ -438,13 +440,11 @@ func (om *OrderedMap) Delete(k any) {
 func (om *OrderedMap) Scan(v any) error {
 	data, ok := v.(OrderedMap)
 	if !ok {
-		return fmt.Errorf("invalid type `%T` for scanning `OrderedMap`, expected `OrderedMap`", data)
+		return fmt.Errorf("invalid type `%T` for scanning `OrderedMap`, expected `OrderedMap`", v)
 	}
 
-	om.keys = make([]any, data.Len())
-	om.values = make([]any, data.Len())
-	copy(om.keys, data.Keys())
-	copy(om.values, data.Values())
+	om.keys = data.Keys()
+	om.values = data.Values()
 
 	return nil
 }
