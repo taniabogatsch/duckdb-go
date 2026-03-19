@@ -56,7 +56,7 @@ type mixedStruct struct {
 		L []int32
 	}
 	C struct {
-		L Map
+		L OrderedMap
 	}
 }
 
@@ -1544,8 +1544,8 @@ func prepareNestedData(rowCount int) []nestedDataRow {
 			{[]int32{1, 2, 3}},
 		},
 		C: struct {
-			L Map
-		}{L: Map{"foo": int32(1), "bar": int32(2)}},
+			L OrderedMap
+		}{L: OrderedMap{[]any{"foo", "bar"}, []any{int32(1), int32(2)}}},
 	}
 
 	rowsToAppend := make([]nestedDataRow, rowCount)
@@ -1593,4 +1593,36 @@ func appendNestedData[T require.TestingT](t T, a *Appender, rowsToAppend []neste
 			row.mixList))
 	}
 	require.NoError(t, a.Flush())
+}
+
+func TestAppenderMapConversion(t *testing.T) {
+	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (id INTEGER, data MAP(VARCHAR, INTEGER))`)
+	defer cleanupAppender(t, c, db, conn, a)
+
+	// Test appending a Go Map (should convert to OrderedMap)
+	testMap := Map{
+		"first":  int32(1),
+		"second": int32(2),
+		"third":  int32(3),
+	}
+
+	require.NoError(t, a.AppendRow(1, testMap))
+	require.NoError(t, a.Flush())
+
+	// Verify the data was appended correctly
+	var id int
+	var result OrderedMap
+	err := db.QueryRow(`SELECT id, data FROM test WHERE id = 1`).Scan(&id, &result)
+	require.NoError(t, err)
+	require.Equal(t, 1, id)
+	require.Equal(t, 3, result.Len())
+
+	// Verify all keys and values are present
+	keys := result.Keys()
+	values := result.Values()
+	resultMap := make(map[any]any)
+	for i, key := range keys {
+		resultMap[key] = values[i]
+	}
+	require.Equal(t, testMap, Map(resultMap))
 }
