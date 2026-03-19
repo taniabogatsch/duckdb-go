@@ -17,8 +17,10 @@ import (
 	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
+// DefaultLoggerCallbackFn defines the signature of a logging callback.
 type DefaultLoggerCallbackFn func(level, logType, logMsg string)
 
+// LoggerCallbacks exposes possible logging callback functions.
 type LoggerCallbacks struct {
 	DefaultLoggerCallback DefaultLoggerCallbackFn
 }
@@ -27,6 +29,9 @@ type extraData struct {
 	callbacks LoggerCallbacks
 }
 
+// RegisterLogStorage enables the user to register a custom log storage on the database instance.
+// After enabling that log storage via "SET logging_storage = 'MyCustomStorage'",
+// DuckDB forwards all log calls to the registered callback function(s).
 func RegisterLogStorage(c *Connector, name string, callbacks LoggerCallbacks) error {
 	// Create the log storage.
 	logStorage := mapping.CreateLogStorage()
