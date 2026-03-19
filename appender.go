@@ -48,8 +48,7 @@ func NewAppender(driverConn driver.Conn, catalog, schema, table string) (*Append
 
 // NewAppenderWithColumns returns a new Appender that is restricted to a subset of columns.
 // This enables more efficient appends by narrowing the appender scope to only the provided columns.
-// The Appender batches rows via AppendRow.
-// Each row must provide values for exactly the selected columns.
+// The Appender batches rows via AppendRow. Each row must provide values for exactly the selected columns.
 // DuckDB will fill columns not selected with their DEFAULT values (or NULL).
 // Note: Changing the active column set causes a flush in DuckDB. Therefore, we cannot change them later during the
 // lifetime of the Appender.
@@ -199,16 +198,18 @@ func NewQueryAppender(driverConn driver.Conn, query, table string, colTypes []Ty
 	return a.initAppenderChunk()
 }
 
-// NewTableAppender returns a new query based on a target table Appender.
+// NewTableAppender returns a new query based on a target table.
 // The Appender batches rows via AppendRow. Upon reaching the auto-flush threshold or
 // upon calling Flush or Close, it executes the query, treating the batched rows as a temporary table.
+// The temporary table of the NewTableAppender expects the same column types as the target table,
+// omitting the need to specify the column types yourself (as is necessary for NewQueryAppender).
 // `driverConn` is the raw sql.Conn's driver connection.
 // `query` is the query to execute. It can be a INSERT, DELETE, UPDATE or MERGE INTO statement.
 // The name of the temporary table is `appended_data`, and its column names are `col1`, `col2`, ...
 // `catalog`, `schema` and `table` specify the target table to append to.
+// The column types of the temporary table match the column types of the target table.
 // `colNames` must be columns in the target table.
 // It defaults to all columns, if empty.
-// The column types of the temporary table must match these chosen column types of the target table.
 func NewTableAppender(driverConn driver.Conn, query, catalog, schema, table string, colNames []string) (*Appender, error) {
 	var a Appender
 	err := a.appenderConn(driverConn)
