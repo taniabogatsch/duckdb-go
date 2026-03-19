@@ -518,7 +518,9 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setList(vec, rowIdx, val)
 	case TYPE_STRUCT:
 		return setStruct(vec, rowIdx, val)
-	case TYPE_MAP, TYPE_ARRAY:
+	case TYPE_MAP:
+		return setMap(vec, rowIdx, val)
+	case TYPE_ARRAY:
 		// FIXME: Is this already supported? And tested?
 		return unsupportedTypeError(unsupportedTypeToStringMap[vec.Type])
 	case TYPE_UUID:
