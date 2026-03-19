@@ -1314,3 +1314,104 @@ func TestMap(t *testing.T) {
 
 	require.Equal(t, testMap, result)
 }
+
+func TestOrderedMapWhereClause(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	_, err := db.Exec(`CREATE TABLE map_equality_test (id INTEGER, data MAP(VARCHAR, INTEGER))`)
+	require.NoError(t, err)
+
+	// Insert two rows with ordered maps
+	orderedMap1 := OrderedMap{
+		keys:   []any{"a", "b", "c"},
+		values: []any{int32(1), int32(2), int32(3)},
+	}
+	orderedMap2 := OrderedMap{
+		keys:   []any{"x", "y", "z"},
+		values: []any{int32(7), int32(8), int32(9)},
+	}
+
+	_, err = db.Exec(`INSERT INTO map_equality_test (id, data) VALUES (?, ?)`, 1, orderedMap1)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO map_equality_test (id, data) VALUES (?, ?)`, 2, orderedMap2)
+	require.NoError(t, err)
+
+	// Test WHERE clause with exact map equality
+	var resultID int
+	var resultMap OrderedMap
+	err = db.QueryRow(`SELECT id, data FROM map_equality_test WHERE data = ?`, orderedMap1).Scan(&resultID, &resultMap)
+	require.NoError(t, err)
+	require.Equal(t, 1, resultID)
+	require.Equal(t, orderedMap1.Keys(), resultMap.Keys())
+	require.Equal(t, orderedMap1.Values(), resultMap.Values())
+
+	// Test that wrong order doesn't match
+	wrongOrderMap := OrderedMap{
+		keys:   []any{"c", "b", "a"}, // Different order
+		values: []any{int32(3), int32(2), int32(1)},
+	}
+	err = db.QueryRow(`SELECT id, data FROM map_equality_test WHERE data = ?`, wrongOrderMap).Scan(&resultID, &resultMap)
+	require.Error(t, err) // Should not find any rows
+}
+
+func TestOrderedMapEmpty(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	_, err := db.Exec(`CREATE TABLE empty_map_test (data MAP(VARCHAR, INTEGER))`)
+	require.NoError(t, err)
+
+	// Test empty OrderedMap
+	emptyMap := OrderedMap{
+		keys:   []any{},
+		values: []any{},
+	}
+
+	_, err = db.Exec(`INSERT INTO empty_map_test (data) VALUES (?)`, emptyMap)
+	require.NoError(t, err)
+
+	var result OrderedMap
+	err = db.QueryRow(`SELECT data FROM empty_map_test`).Scan(&result)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, result.Len())
+	require.Equal(t, emptyMap.Keys(), result.Keys())
+	require.Equal(t, emptyMap.Values(), result.Values())
+}
+
+func TestOrderedMapNullValue(t *testing.T) {
+	db := openDbWrapper(t, ``)
+	defer closeDbWrapper(t, db)
+
+	_, err := db.Exec(`CREATE TABLE null_map_test (id INTEGER, data MAP(VARCHAR, INTEGER))`)
+	require.NoError(t, err)
+
+	// Test inserting a NULL map
+	_, err = db.Exec(`INSERT INTO null_map_test (id, data) VALUES (?, ?)`, 1, nil)
+	require.NoError(t, err)
+
+	// Test inserting a regular map
+	regularMap := OrderedMap{
+		keys:   []any{"first", "second"},
+		values: []any{int32(1), int32(2)},
+	}
+	_, err = db.Exec(`INSERT INTO null_map_test (id, data) VALUES (?, ?)`, 2, regularMap)
+	require.NoError(t, err)
+
+	// Verify NULL map
+	var id int
+	var result *OrderedMap
+	err = db.QueryRow(`SELECT id, data FROM null_map_test WHERE id = 1`).Scan(&id, &result)
+	require.NoError(t, err)
+	require.Equal(t, 1, id)
+	require.Nil(t, result)
+
+	// Verify regular map
+	var result2 OrderedMap
+	err = db.QueryRow(`SELECT id, data FROM null_map_test WHERE id = 2`).Scan(&id, &result2)
+	require.NoError(t, err)
+	require.Equal(t, 2, id)
+	require.Equal(t, regularMap.Keys(), result2.Keys())
+	require.Equal(t, regularMap.Values(), result2.Values())
+}

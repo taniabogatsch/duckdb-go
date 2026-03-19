@@ -358,9 +358,10 @@ func setMap[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 
 	// Create a LIST of STRUCT values.
 	list := make([]any, m.Len())
-	for i, key := range m.Keys() {
-		value, _ := m.Get(key)
-		list[i] = map[string]any{mapKeysField(): key, mapValuesField(): value}
+	keys := m.Keys()
+	vals := m.Values()
+	for i := range keys {
+		list[i] = map[string]any{mapKeysField(): keys[i], mapValuesField(): vals[i]}
 	}
 
 	return setList(vec, rowIdx, list)
