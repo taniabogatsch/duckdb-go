@@ -523,10 +523,15 @@ func createMapValue(lt mapping.LogicalType, val any) (mapping.Value, error) {
 		return mapping.Value{}, castError(reflect.TypeOf(val).Name(), reflectTypeMap.Name())
 	}
 
+	keyType := mapping.MapTypeKeyType(lt)
+	defer mapping.DestroyLogicalType(&keyType)
+	valueType := mapping.MapTypeValueType(lt)
+	defer mapping.DestroyLogicalType(&valueType)
+
 	keys := make([]mapping.Value, m.Len())
 	defer destroyValueSlice(keys)
 	for i, k := range m.Keys() {
-		kv, err := createValue(mapping.MapTypeKeyType(lt), k)
+		kv, err := createValue(keyType, k)
 		if err != nil {
 			return mapping.Value{}, err
 		}
@@ -536,7 +541,7 @@ func createMapValue(lt mapping.LogicalType, val any) (mapping.Value, error) {
 	values := make([]mapping.Value, m.Len())
 	defer destroyValueSlice(values)
 	for i, v := range m.Values() {
-		vv, err := createValue(mapping.MapTypeValueType(lt), v)
+		vv, err := createValue(valueType, v)
 		if err != nil {
 			return mapping.Value{}, err
 		}
