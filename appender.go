@@ -1,6 +1,7 @@
 package duckdb
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 
@@ -198,6 +199,65 @@ func NewQueryAppender(driverConn driver.Conn, query, table string, colTypes []Ty
 	return a.initAppenderChunk()
 }
 
+// NewTableAppender returns a new query based on a target table Appender.
+// The Appender batches rows via AppendRow. Upon reaching the auto-flush threshold or
+// upon calling Flush or Close, it executes the query, treating the batched rows as a temporary table.
+// `driverConn` is the raw sql.Conn's driver connection.
+// `query` is the query to execute. It can be a INSERT, DELETE, UPDATE or MERGE INTO statement.
+// The name of the temporary table is `appended_data`, and its column names are `col1`, `col2`, ...
+// `catalog`, `schema` and `table` specify the target table to append to.
+// `colNames` must be columns in the target table.
+// It defaults to all columns, if empty.
+// The column types of the temporary table must match these chosen column types of the target table.
+func NewTableAppender(driverConn driver.Conn, query, catalog, schema, table string, colNames []string) (*Appender, error) {
+	var a Appender
+	err := a.appenderConn(driverConn)
+	if err != nil {
+		return nil, err
+	}
+
+	if query == "" {
+		return nil, getError(errAppenderEmptyQuery, nil)
+	}
+
+	// Get the logical types via the table description.
+	var desc mapping.TableDescription
+	mapping.TableDescriptionCreateExt(a.conn.conn, catalog, schema, table, &desc)
+	defer mapping.TableDescriptionDestroy(&desc)
+
+	// First, put the names in a map.
+	allColumns := len(colNames) == 0
+	m := make(map[string]bool)
+	if !allColumns {
+		for _, name := range colNames {
+			m[name] = true
+		}
+	}
+
+	// Now set the logical types.
+	colCount := mapping.TableDescriptionGetColumnCount(desc)
+	for i := range uint64(colCount) {
+		if !allColumns {
+			colName := mapping.TableDescriptionGetColumnName(desc, mapping.IdxT(i))
+			if _, ok := m[colName]; !ok {
+				continue
+			}
+		}
+		logicalType := mapping.TableDescriptionGetColumnType(desc, mapping.IdxT(i))
+		a.types = append(a.types, logicalType)
+	}
+
+	state := mapping.AppenderCreateQuery(a.conn.conn, query, a.types, "", []string{}, &a.appender)
+	if state == mapping.StateError {
+		destroyLogicalTypes(a.types)
+		err = errorDataError(mapping.AppenderErrorData(a.appender))
+		mapping.AppenderDestroy(&a.appender)
+		return nil, getError(errAppenderCreation, err)
+	}
+
+	return a.initAppenderChunk()
+}
+
 // Flush the data chunks to the underlying table and clear the internal cache.
 // Does not close the appender, even if it returns an error. Unless you have a good reason to call this,
 // call Close when you are done with the appender.
@@ -206,17 +266,59 @@ func (a *Appender) Flush() error {
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 
-	if mapping.AppenderFlush(a.appender) == mapping.StateError {
-		err := getDuckDBError(mapping.AppenderError(a.appender))
+	if err := a.flush(); err != nil {
 		return getError(errAppenderFlush, invalidatedAppenderError(err))
 	}
 
 	return nil
 }
 
+// FlushWithCancel flushes the data chunks to the underlying table and clears the internal cache.
+// Does not close the appender, even if it returns an error. Unless you have a good reason to call this,
+// call CloseWithCancel when you are done with the appender.
+// Takes a context for cancellation.
+func (a *Appender) FlushWithCancel(ctx context.Context) error {
+	if err := a.appendDataChunk(); err != nil {
+		return getError(errAppenderFlush, invalidatedAppenderError(err))
+	}
+
+	if err := a.flushWithCancel(ctx); err != nil {
+		return getError(errAppenderFlush, invalidatedAppenderError(err))
+	}
+
+	return nil
+}
+
+// Clear clears the appender's internal state, discarding any appended but not yet flushed data.
+// This resets the DuckDB appender's internal state.
+// Clear is typically used after an error occurs during Flush or FlushWithCancel to avoid memory leaks
+// before closing the appender. After calling Clear, the appender can be reused for appending new rows.
+func (a *Appender) Clear() error {
+	var errClear error
+	if mapping.AppenderClear(a.appender) == mapping.StateError {
+		errClear = getDuckDBError(mapping.AppenderError(a.appender))
+	}
+
+	a.chunk.reset(true)
+	a.rowCount = 0
+
+	if errClear != nil {
+		return getError(invalidatedAppenderClearError(errClear), nil)
+	}
+	return nil
+}
+
 // Close the appender. This will flush the appender to the underlying table.
 // It is vital to call this when you are done with the appender to avoid leaking memory.
 func (a *Appender) Close() error {
+	return a.CloseWithCancel(context.Background())
+}
+
+// CloseWithCancel closes the appender. This flushes any remaining data chunks to the underlying table.
+// The flush operation can be cancelled via the provided context. If the flush fails, the appender is cleared
+// before closing to prevent a memory leak. It is essential to call this function when you are done with
+// the appender to avoid leaking memory.
+func (a *Appender) CloseWithCancel(ctx context.Context) error {
 	if a.closed {
 		return getError(errAppenderDoubleClose, nil)
 	}
@@ -227,21 +329,21 @@ func (a *Appender) Close() error {
 	a.chunk.close()
 
 	// We flush before closing to get a meaningful error message.
-	var errFlush error
-	if mapping.AppenderFlush(a.appender) == mapping.StateError {
-		errFlush = getDuckDBError(mapping.AppenderError(a.appender))
-	}
+	errFlush := a.flushWithCancel(ctx)
 
+	var errClear error
+	if errFlush != nil {
+		errClear = a.Clear()
+	}
 	// Destroy all appender data and the appender.
 	destroyLogicalTypes(a.types)
 	var errClose error
 	if mapping.AppenderDestroy(&a.appender) == mapping.StateError {
 		errClose = errAppenderClose
 	}
-
-	err := errors.Join(errAppend, errFlush, errClose)
+	err := errors.Join(errAppend, errFlush, errClose, errClear)
 	if err != nil {
-		return getError(invalidatedAppenderError(err), nil)
+		return getError(errAppenderClose, err)
 	}
 
 	return nil
@@ -324,6 +426,39 @@ func (a *Appender) appendDataChunk() error {
 
 	a.chunk.reset(true)
 	a.rowCount = 0
+
+	return nil
+}
+
+func (a *Appender) flush() error {
+	if mapping.AppenderFlush(a.appender) == mapping.StateError {
+		return getDuckDBError(mapping.AppenderError(a.appender))
+	}
+	return nil
+}
+
+func (a *Appender) flushWithCancel(ctx context.Context) error {
+	mainDoneCh := make(chan struct{})
+	bgDoneCh := make(chan struct{})
+
+	// Spawn go-routine waiting to receive on the context or main channel.
+	go interruptRoutine(&mainDoneCh, &bgDoneCh, ctx, a.conn)
+
+	state := mapping.AppenderFlush(a.appender)
+
+	// We finished executing the flush operation.
+	// Close the main channel.
+	close(mainDoneCh)
+
+	// Wait for the background go-routine to finish, too.
+	// Sometimes the go-routine is not scheduled immediately.
+	// By the time it is scheduled, another query might be running on this connection.
+	// If we don't wait for the go-routine to finish, it can cancel that new query.
+	<-bgDoneCh
+
+	if state == mapping.StateError {
+		return errors.Join(ctx.Err(), getDuckDBError(mapping.AppenderError(a.appender)))
+	}
 
 	return nil
 }
