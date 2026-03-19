@@ -1352,7 +1352,7 @@ func TestOrderedMapWhereClause(t *testing.T) {
 		values: []any{int32(3), int32(2), int32(1)},
 	}
 	err = db.QueryRow(`SELECT id, data FROM map_equality_test WHERE data = ?`, wrongOrderMap).Scan(&resultID, &resultMap)
-	require.Error(t, err) // Should not find any rows
+	require.ErrorIs(t, err, sql.ErrNoRows)
 }
 
 func TestOrderedMapEmpty(t *testing.T) {
