@@ -351,7 +351,7 @@ func inferUHugeInt(val any) (mapping.UHugeInt, error) {
 // Map is used to represent DuckDB maps as Go maps.
 // Note that Go maps do not preserve key order, so direct comparison operations
 // on DuckDB maps may not behave as expected when using this type. Use OrderedMap as an alternative.
-// [Deprecated: Use OrderedMap instead to preserve key order.]
+// Deprecated: Use OrderedMap instead to preserve key order.
 type Map map[any]any
 
 func (m *Map) Scan(v any) error {
