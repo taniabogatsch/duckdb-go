@@ -258,6 +258,15 @@ func inferLogicalTypeAndValue(v any) (mapping.LogicalType, mapping.Value, error)
 		return mapping.CreateLogicalType(t), val, err
 	}
 
+	if t == TYPE_MAP {
+		// TODO.
+		return mapping.LogicalType{}, mapping.Value{}, unsupportedTypeError(typeToStringMap[t])
+	}
+	if t == TYPE_UNION {
+		// TODO.
+		return mapping.LogicalType{}, mapping.Value{}, unsupportedTypeError(typeToStringMap[t])
+	}
+
 	// User-provided type with a Stringer interface:
 	// We create a string and return a VARCHAR value.
 	// TYPE_DECIMAL has a Stringer interface.
@@ -278,15 +287,6 @@ func inferLogicalTypeAndValue(v any) (mapping.LogicalType, mapping.Value, error)
 			return mapping.LogicalType{}, mapping.Value{}, err
 		}
 		return mapping.CreateLogicalType(t), val, err
-	}
-
-	if t == TYPE_MAP {
-		// TODO.
-		return mapping.LogicalType{}, mapping.Value{}, unsupportedTypeError(typeToStringMap[t])
-	}
-	if t == TYPE_UNION {
-		// TODO.
-		return mapping.LogicalType{}, mapping.Value{}, unsupportedTypeError(typeToStringMap[t])
 	}
 
 	// Complex types.
