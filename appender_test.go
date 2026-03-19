@@ -1626,4 +1626,3 @@ func TestAppenderMapConversion(t *testing.T) {
 	}
 	require.Equal(t, testMap, Map(resultMap))
 }
-
