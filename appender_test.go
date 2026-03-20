@@ -1710,7 +1710,7 @@ func appendNestedData[T require.TestingT](t T, a *Appender, rowsToAppend []neste
 }
 
 func TestAppenderMapConversion(t *testing.T) {
-	c, db, conn, a := prepareAppender(t, `CREATE TABLE test (id INTEGER, data MAP(VARCHAR, INTEGER))`)
+	c, db, conn, a := prepareAppender(t, appenderTypeDefault, `CREATE TABLE test (id INTEGER, data MAP(VARCHAR, INTEGER))`)
 	defer cleanupAppender(t, c, db, conn, a)
 
 	// Test appending a Go Map (should convert to OrderedMap)
