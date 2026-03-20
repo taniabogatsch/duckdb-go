@@ -320,22 +320,26 @@ func testTypes[T require.TestingT](t T, db *sql.DB, a *Appender, expectedRows []
 }
 
 func TestTypes(t *testing.T) {
-	expectedRows := testTypesGenerateRows(t, 3)
-	c, db, conn, a := prepareAppender(t, testTypesEnumSQL+";"+testTypesTableSQL)
-	defer cleanupAppender(t, c, db, conn, a)
-	actualRows := testTypes(t, db, a, expectedRows)
+	for _, appenderType := range appenderTypes {
+		func() {
+			expectedRows := testTypesGenerateRows(t, 3)
+			c, db, conn, a := prepareAppender(t, appenderType, testTypesEnumSQL+";"+testTypesTableSQL)
+			defer cleanupAppender(t, c, db, conn, a)
+			actualRows := testTypes(t, db, a, expectedRows)
 
-	for i := range actualRows {
-		expectedRows[i].toUTC()
-		// Time_tz_col preserves timezone, compare using Equal() which compares instants.
-		require.True(t, expectedRows[i].Time_tz_col.Equal(actualRows[i].Time_tz_col),
-			"Time_tz_col mismatch: expected %v, got %v", expectedRows[i].Time_tz_col, actualRows[i].Time_tz_col)
-		// Set to same value for struct comparison.
-		actualRows[i].Time_tz_col = expectedRows[i].Time_tz_col
-		actualRows[i].normalizeBigInt()
-		require.Equal(t, expectedRows[i], actualRows[i])
+			for i := range actualRows {
+				expectedRows[i].toUTC()
+				// Time_tz_col preserves timezone, compare using Equal() which compares instants.
+				require.True(t, expectedRows[i].Time_tz_col.Equal(actualRows[i].Time_tz_col),
+					"Time_tz_col mismatch: expected %v, got %v", expectedRows[i].Time_tz_col, actualRows[i].Time_tz_col)
+				// Set to same value for struct comparison.
+				actualRows[i].Time_tz_col = expectedRows[i].Time_tz_col
+				actualRows[i].normalizeBigInt()
+				require.Equal(t, expectedRows[i], actualRows[i])
+			}
+			require.Len(t, actualRows, len(expectedRows))
+		}()
 	}
-	require.Len(t, actualRows, len(expectedRows))
 }
 
 // NOTE: duckdb-go only contains very few benchmarks. The purpose of those benchmarks is to avoid regressions
@@ -344,7 +348,7 @@ var benchmarkTypesResult []testTypesRow
 
 func BenchmarkTypes(b *testing.B) {
 	expectedRows := testTypesGenerateRows(b, GetDataChunkCapacity()*3+10)
-	c, db, conn, a := prepareAppender(b, testTypesEnumSQL+";"+testTypesTableSQL)
+	c, db, conn, a := prepareAppender(b, appenderTypeDefault, testTypesEnumSQL+";"+testTypesTableSQL)
 	defer cleanupAppender(b, c, db, conn, a)
 
 	var r []testTypesRow

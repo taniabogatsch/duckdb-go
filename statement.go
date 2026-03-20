@@ -685,6 +685,20 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 	return s.executeBound(ctx)
 }
 
+func interruptRoutine(mainDoneCh, bgDoneCh *chan struct{}, ctx context.Context, conn *Conn) {
+	select {
+	// Await an interrupt on the context.
+	case <-ctx.Done():
+		mapping.Interrupt(conn.conn)
+		break
+	// Await a done-signal on the main channel.
+	// Reading from a closed channel succeeds immediately.
+	case <-*mainDoneCh:
+		break
+	}
+	close(*bgDoneCh)
+}
+
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
 	// Phase 1: create pending result
