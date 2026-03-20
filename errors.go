@@ -137,7 +137,8 @@ var (
 	errAppenderFlush            = errors.New("could not flush appender")
 	errAppenderEmptyQuery       = errors.New("empty query")
 	errAppenderEmptyColumnTypes = errors.New("empty column types")
-	errAppenderColumnMismatch   = errors.New("mismatch between the number of column types and names")
+	errAppenderColumnMismatch   = errors.New("mismatch between the column types and names")
+	errAppenderDuplicateColumn  = errors.New("duplicate column name")
 
 	errUnsupportedMapKeyType = errors.New("MAP key type not supported")
 	errEmptyName             = errors.New("empty name")

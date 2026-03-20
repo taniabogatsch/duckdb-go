@@ -91,6 +91,33 @@ func TestErrAppender(t *testing.T) {
 		testError(t, err, errAppenderCreation.Error())
 	})
 
+	t.Run(errAppenderCreation.Error(), func(t *testing.T) {
+		c := newConnectorWrapper(t, ``, nil)
+		defer closeConnectorWrapper(t, c)
+
+		conn := openDriverConnWrapper(t, c)
+		defer closeDriverConnWrapper(t, &conn)
+
+		appendQuery := `INSERT INTO test FROM appended_data`
+
+		a, err := NewTableAppender(conn, appendQuery, "", "", "does_not_exist", []string{})
+		defer closeAppenderWrapper(t, a)
+		testError(t, err, errAppenderCreation.Error(), "No table with that schema+name could be located")
+
+		// Create the table.
+		db := sql.OpenDB(c)
+		_, err = db.Exec(`CREATE TABLE test (i INT)`)
+		require.NoError(t, err)
+
+		a, err = NewTableAppender(conn, appendQuery, "", "", "test", []string{"a", "a"})
+		defer closeAppenderWrapper(t, a)
+		testError(t, err, errAppenderDuplicateColumn.Error())
+
+		a, err = NewTableAppender(conn, appendQuery, "", "", "test", []string{"i", "b"})
+		defer closeAppenderWrapper(t, a)
+		testError(t, err, errAppenderColumnMismatch.Error())
+	})
+
 	t.Run(errAppenderEmptyQuery.Error(), func(t *testing.T) {
 		c := newConnectorWrapper(t, ``, nil)
 		defer closeConnectorWrapper(t, c)

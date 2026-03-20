@@ -223,14 +223,21 @@ func NewTableAppender(driverConn driver.Conn, query, catalog, schema, table stri
 
 	// Get the logical types via the table description.
 	var desc mapping.TableDescription
-	mapping.TableDescriptionCreateExt(a.conn.conn, catalog, schema, table, &desc)
+	state := mapping.TableDescriptionCreateExt(a.conn.conn, catalog, schema, table, &desc)
 	defer mapping.TableDescriptionDestroy(&desc)
+	if state == mapping.StateError {
+		errStr := mapping.TableDescriptionError(desc)
+		return nil, getError(errAppenderCreation, errors.New(errStr))
+	}
 
 	// First, put the names in a map.
 	allColumns := len(colNames) == 0
 	m := make(map[string]bool)
 	if !allColumns {
 		for _, name := range colNames {
+			if _, ok := m[name]; ok {
+				return nil, getError(errAppenderDuplicateColumn, nil)
+			}
 			m[name] = true
 		}
 	}
@@ -247,8 +254,12 @@ func NewTableAppender(driverConn driver.Conn, query, catalog, schema, table stri
 		logicalType := mapping.TableDescriptionGetColumnType(desc, mapping.IdxT(i))
 		a.types = append(a.types, logicalType)
 	}
+	if !allColumns && len(a.types) != len(colNames) {
+		destroyLogicalTypes(a.types)
+		return nil, getError(errAppenderColumnMismatch, nil)
+	}
 
-	state := mapping.AppenderCreateQuery(a.conn.conn, query, a.types, "", []string{}, &a.appender)
+	state = mapping.AppenderCreateQuery(a.conn.conn, query, a.types, "", []string{}, &a.appender)
 	if state == mapping.StateError {
 		destroyLogicalTypes(a.types)
 		err = errorDataError(mapping.AppenderErrorData(a.appender))
