@@ -228,6 +228,8 @@ func (vec *vector) getDecimal(rowIdx mapping.IdxT) Decimal {
 	case TYPE_HUGEINT:
 		v := getPrimitive[mapping.HugeInt](vec, rowIdx)
 		val = hugeIntToNative(&v)
+	default:
+		panic(unsupportedTypeError(typeName(vec.internalType)))
 	}
 	return Decimal{Width: vec.decimalWidth, Scale: vec.decimalScale, Value: val}
 }
@@ -243,6 +245,8 @@ func (vec *vector) getEnum(rowIdx mapping.IdxT) string {
 		idx = mapping.IdxT(getPrimitive[uint32](vec, rowIdx))
 	case TYPE_UBIGINT:
 		idx = mapping.IdxT(getPrimitive[uint64](vec, rowIdx))
+	default:
+		panic(unsupportedTypeError(typeName(vec.internalType)))
 	}
 
 	// Use the pre-built slice instead of CGO round-trips.
