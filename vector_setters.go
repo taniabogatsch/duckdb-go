@@ -276,8 +276,9 @@ func setDecimal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setNumeric[S, int64](vec, rowIdx, val)
 	case TYPE_HUGEINT:
 		return setHugeint(vec, rowIdx, val)
+	default:
+		return unsupportedTypeError(typeName(vec.internalType))
 	}
-	return nil
 }
 
 func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
