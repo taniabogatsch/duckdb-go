@@ -171,11 +171,11 @@ func (*chunkSum) Config() duckdb.ScalarFuncConfig {
 
 func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
 	return duckdb.ScalarFuncExecutor{
-		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ScalarUDFChunk) error {
-			rows, onFinish := chunk.Rows()
-			for row := range rows {
-				result := row.Args[0].(int32) + row.Args[1].(int32)
-				if err := row.SetResult(result); err != nil {
+		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ChunkIteratorState) error {
+			rs, onFinish := chunk.Rows()
+			for row := range rs {
+				res := row.Args[0].(int32) + row.Args[1].(int32)
+				if err := row.SetResult(res); err != nil {
 					return err
 				}
 			}
@@ -202,7 +202,7 @@ func chunkSumScalarUDF() {
 	rows, err := db.Query(`SELECT chunk_sum(a, b) FROM test_chunk`)
 	check(err)
 	defer func() {
-		err := rows.Close()
+		err = rows.Close()
 		check(err)
 	}()
 
