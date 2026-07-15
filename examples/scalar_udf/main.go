@@ -176,7 +176,7 @@ func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
 				if err != nil {
 					return err
 				}
-				res := row.GetValue(0).(int32) + row.GetValue(1).(int32)
+				res := (*row.GetValuePtr(0)).(int32) + (*row.GetValuePtr(1)).(int32)
 				if err = row.SetResult(res); err != nil {
 					return err
 				}

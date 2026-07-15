@@ -8,8 +8,7 @@ import (
 )
 
 // ChunkIteratorState is the chunk-based iterator passed to a ChunkContextExecutorFn.
-// It iterates over its rows via Rows(). Copy the Args if you need to, as they are
-// not retained between loop iterations.
+// It iterates over its rows via Rows().
 type ChunkIteratorState struct {
 	r             Row
 	output        *vector
@@ -23,12 +22,14 @@ func (iterState *ChunkIteratorState) SetResult(val any) error {
 	return iterState.output.SetValue(int(iterState.r.rowIdx), val)
 }
 
-// GetValue TODO: comment
-func (iterState *ChunkIteratorState) GetValue(colIdx int) driver.Value {
-	return iterState.args[colIdx]
+// GetValuePtr returns a pointer to the current row value for a column.
+// Copy the value if you need to, as it is not retained between loop iterations.
+func (iterState *ChunkIteratorState) GetValuePtr(colIdx int) *driver.Value {
+	return &iterState.args[colIdx]
 }
 
-// Rows TODO: comment
+// Rows is used to iterate over the rows of a data chunk, and to set the result of a
+// computation on a row in the output vector.
 func (iterState *ChunkIteratorState) Rows() iter.Seq2[*ChunkIteratorState, error] {
 	colCount := iterState.r.chunk.ColumnCount()
 
@@ -37,7 +38,7 @@ func (iterState *ChunkIteratorState) Rows() iter.Seq2[*ChunkIteratorState, error
 		for rowIdx := range iterState.r.chunk.GetSize() {
 			hasNull := false
 			for colIdx := range colCount {
-				// FIXME: Could be replaced with a vectorized getter function.
+				// FIXME: Could likely be replaced with a vectorized getter function.
 				iterState.args[colIdx], err = iterState.r.chunk.GetValue(colIdx, rowIdx)
 				if err != nil {
 					yield(nil, err)

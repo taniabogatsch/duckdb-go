@@ -768,7 +768,7 @@ func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 				if err != nil {
 					return err
 				}
-				res := row.GetValue(0).(int32) + row.GetValue(1).(int32)
+				res := (*row.GetValuePtr(0)).(int32) + (*row.GetValuePtr(1)).(int32)
 				if err = row.SetResult(res); err != nil {
 					return err
 				}
@@ -819,13 +819,13 @@ func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 				if err != nil {
 					return err
 				}
-				val := row.GetValue(0)
-				if val == nil {
+				val := row.GetValuePtr(0)
+				if *val == nil {
 					if err = row.SetResult(int32(-1)); err != nil {
 						return err
 					}
 				} else {
-					if err = row.SetResult(val.(int32) * 2); err != nil {
+					if err = row.SetResult((*val).(int32) * 2); err != nil {
 						return err
 					}
 				}
