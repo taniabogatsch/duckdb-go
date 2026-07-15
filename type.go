@@ -1,6 +1,8 @@
 package duckdb
 
 import (
+	"fmt"
+
 	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
@@ -45,14 +47,21 @@ const (
 	TYPE_ANY          = mapping.TypeAny
 	TYPE_BIGNUM       = mapping.TypeBigNum
 	TYPE_SQLNULL      = mapping.TypeSQLNull
+	TYPE_GEOMETRY     = mapping.TypeGeometry
+	TYPE_VARIANT      = mapping.TypeVariant
 	// TODO: add TYPE_TIME_NS here, or support it.
 )
 
 // FIXME: Implement support for these types.
 var unsupportedTypeToStringMap = map[Type]string{
 	TYPE_INVALID: "INVALID",
-	TYPE_BIT:     "BIT",
 	TYPE_ANY:     "ANY",
+}
+
+var unsupportedValueTypeToStringMap = map[Type]string{
+	TYPE_INVALID: "INVALID",
+	TYPE_ANY:     "ANY",
+	TYPE_VARIANT: "VARIANT",
 }
 
 var typeToStringMap = map[Type]string{
@@ -93,6 +102,15 @@ var typeToStringMap = map[Type]string{
 	TYPE_ANY:          "ANY",
 	TYPE_BIGNUM:       "BIGNUM",
 	TYPE_SQLNULL:      "SQLNULL",
+	TYPE_GEOMETRY:     "GEOMETRY",
+	TYPE_VARIANT:      "VARIANT",
+}
+
+func typeName(t Type) string {
+	if name, ok := typeToStringMap[t]; ok {
+		return name
+	}
+	return fmt.Sprintf("%s (%d)", unknownTypeErrMsg, t)
 }
 
 const aliasJSON = "JSON"

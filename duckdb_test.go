@@ -5,23 +5,45 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"os"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/duckdb/duckdb-go/v2/mapping"
 )
 
 /* ---------- Open and Close Wrappers ---------- */
 
+// addExtensionDirWorkaround works around a DuckDB v1.5.0 regression where the default
+// extension directory is malformed on Windows (https://github.com/duckdb/duckdb/pull/21260).
+// Uses os.MkdirTemp instead of t.TempDir() to avoid Windows cleanup failures when DuckDB
+// still holds extension file handles.
+func addExtensionDirWorkaround[T require.TestingT](t T, dsn string) string {
+	if runtime.GOOS != "windows" {
+		return dsn
+	}
+
+	extDir, err := os.MkdirTemp("", "duckdb-ext-*")
+	require.NoError(t, err)
+
+	if strings.Contains(dsn, "?") {
+		return dsn + "&extension_directory=" + extDir
+	}
+	return dsn + "?extension_directory=" + extDir
+}
+
 func openDbWrapper[T require.TestingT](t T, dsn string) *sql.DB {
-	db, err := sql.Open(`duckdb`, dsn)
+	db, err := sql.Open(`duckdb`, addExtensionDirWorkaround(t, dsn))
 	require.NoError(t, err)
 	require.NoError(t, db.Ping())
 	return db
@@ -35,7 +57,7 @@ func closeDbWrapper[T require.TestingT](t T, db *sql.DB) {
 }
 
 func newConnectorWrapper[T require.TestingT](t T, dsn string, connInitFn func(execer driver.ExecerContext) error) *Connector {
-	c, err := NewConnector(dsn, connInitFn)
+	c, err := NewConnector(addExtensionDirWorkaround(t, dsn), connInitFn)
 	require.NoError(t, err)
 	return c
 }
@@ -99,6 +121,12 @@ func newQueryAppenderWrapper[T require.TestingT](t T, conn *driver.Conn, query, 
 	return a
 }
 
+func newTableAppenderWrapper[T require.TestingT](t T, conn *driver.Conn, query, catalog, schema, table string, colNames []string) *Appender {
+	a, err := NewTableAppender(*conn, query, catalog, schema, table, colNames)
+	require.NoError(t, err)
+	return a
+}
+
 func closeAppenderWrapper[T require.TestingT](t T, a *Appender) {
 	if a == nil {
 		return
@@ -107,6 +135,16 @@ func closeAppenderWrapper[T require.TestingT](t T, a *Appender) {
 }
 
 /* ---------- Test Helpers ---------- */
+
+// patchVar temporarily sets *p to v and restores the original on test cleanup.
+// Used to swap package-level mapping hooks in tests that must not run in parallel.
+func patchVar[T any](t *testing.T, p *T, v T) {
+	t.Helper()
+
+	orig := *p
+	*p = v
+	t.Cleanup(func() { *p = orig })
+}
 
 func createTable(t *testing.T, db *sql.DB, query string) {
 	res, err := db.Exec(query)
@@ -194,6 +232,57 @@ func TestConnector_Close(t *testing.T) {
 	// Multiple close calls must not cause panics or errors.
 	closeConnectorWrapper(t, c)
 	closeConnectorWrapper(t, c)
+}
+
+// This test patches package-level mapping hooks and must not run in parallel.
+func TestConnectCleansUpOnInitError(t *testing.T) {
+	initErr := errors.New("init failed")
+	c := newConnectorWrapper(t, ``, func(driver.ExecerContext) error {
+		return initErr
+	})
+	defer closeConnectorWrapper(t, c)
+
+	disconnectCount := countDisconnects(t)
+
+	conn, err := c.Connect(context.Background())
+	require.Nil(t, conn)
+	require.Equal(t, initErr, err)
+	require.ErrorIs(t, err, initErr)
+	require.Equal(t, 1, *disconnectCount)
+}
+
+func TestConnectKeepsInitErrorWhenInitAlreadyClosed(t *testing.T) {
+	initErr := errors.New("init failed")
+	c := newConnectorWrapper(t, ``, func(execer driver.ExecerContext) error {
+		conn, ok := execer.(driver.Conn)
+		require.True(t, ok)
+		require.NoError(t, conn.Close())
+		return initErr
+	})
+	defer closeConnectorWrapper(t, c)
+
+	disconnectCount := countDisconnects(t)
+
+	conn, err := c.Connect(context.Background())
+	require.Nil(t, conn)
+	require.Equal(t, initErr, err)
+	require.ErrorIs(t, err, initErr)
+	require.Equal(t, 1, *disconnectCount)
+}
+
+func countDisconnects(t *testing.T) *int {
+	t.Helper()
+
+	// Connect is single-goroutine, so a plain counter is enough. The stub calls
+	// through to the real Disconnect so the fresh connection is actually torn down.
+	var disconnectCount int
+	origDisconnect := mapping.Disconnect
+	patchVar(t, &mapping.Disconnect, func(conn *mapping.Connection) {
+		disconnectCount++
+		origDisconnect(conn)
+	})
+
+	return &disconnectCount
 }
 
 func ExampleNewConnector() {
@@ -555,6 +644,12 @@ func TestTypeNamesAndScanTypes(t *testing.T) {
 			value:    []byte("foo"),
 			typeName: "BLOB",
 		},
+		// DUCKDB_TYPE_BIT
+		{
+			sql:      `SELECT '10101'::BIT AS col`,
+			value:    "10101",
+			typeName: "BIT",
+		},
 		// DUCKDB_TYPE_DECIMAL
 		{
 			sql:      `SELECT 31::DECIMAL(30,17) AS col`,
@@ -599,7 +694,7 @@ func TestTypeNamesAndScanTypes(t *testing.T) {
 		// DUCKDB_TYPE_MAP
 		{
 			sql:      `SELECT map([1, 5], ['a', 'e']) AS col`,
-			value:    Map{int32(1): "a", int32(5): "e"},
+			value:    OrderedMap{[]any{int32(1), int32(5)}, []any{"a", "e"}},
 			typeName: "MAP(INTEGER, VARCHAR)",
 		},
 		// DUCKDB_TYPE_ARRAY

@@ -220,12 +220,41 @@ func setBignum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 func setBytes[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	switch v := any(val).(type) {
 	case string:
-		mapping.VectorAssignStringElement(vec.vec, rowIdx, v)
+		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, []byte(v))
 	case []byte:
 		mapping.VectorAssignStringElementLen(vec.vec, rowIdx, v)
 	default:
 		return castError(reflect.TypeOf(val).String(), reflect.String.String())
 	}
+	return nil
+}
+
+func setBit[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
+	var bit Bit
+	switch v := any(val).(type) {
+	case Bit:
+		bit = v
+	case *Bit:
+		bit = *v
+	case string:
+		var err error
+		bit, err = NewBitFromString(v)
+		if err != nil {
+			return err
+		}
+	case []byte:
+		var err error
+		bit, err = NewBitFromString(string(v))
+		if err != nil {
+			return err
+		}
+	default:
+		return castError(reflect.TypeOf(val).String(), reflectTypeBit.String())
+	}
+	if err := bit.Validate(); err != nil {
+		return err
+	}
+	mapping.VectorAssignStringElementLen(vec.vec, rowIdx, bit.Data)
 	return nil
 }
 
@@ -247,8 +276,9 @@ func setDecimal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setNumeric[S, int64](vec, rowIdx, val)
 	case TYPE_HUGEINT:
 		return setHugeint(vec, rowIdx, val)
+	default:
+		return unsupportedTypeError(typeName(vec.internalType))
 	}
-	return nil
 }
 
 func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
@@ -263,18 +293,18 @@ func setEnum[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	if v, ok := vec.namesDict[str]; ok {
 		switch vec.internalType {
 		case TYPE_UTINYINT:
-			return setNumeric[uint32, int8](vec, rowIdx, v)
-		case TYPE_SMALLINT:
-			return setNumeric[uint32, int16](vec, rowIdx, v)
-		case TYPE_INTEGER:
-			return setNumeric[uint32, int32](vec, rowIdx, v)
-		case TYPE_BIGINT:
-			return setNumeric[uint32, int64](vec, rowIdx, v)
+			return setNumeric[uint32, uint8](vec, rowIdx, v)
+		case TYPE_USMALLINT:
+			return setNumeric[uint32, uint16](vec, rowIdx, v)
+		case TYPE_UINTEGER:
+			return setNumeric[uint32, uint32](vec, rowIdx, v)
+		case TYPE_UBIGINT:
+			return setNumeric[uint32, uint64](vec, rowIdx, v)
+		default:
+			return unsupportedTypeError(typeName(vec.internalType))
 		}
-	} else {
-		return castError(reflect.TypeOf(val).String(), reflectTypeString.String())
 	}
-	return nil
+	return invalidInputError(str, "value in enum dictionary")
 }
 
 func setList[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
@@ -342,20 +372,26 @@ func setStruct[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 }
 
 func setMap[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	var m Map
+	var m OrderedMap
+
 	switch v := any(val).(type) {
-	case Map:
+	case OrderedMap:
 		m = v
+	case Map:
+		m = OrderedMap{}
+		for key, value := range v {
+			m.Set(key, value)
+		}
 	default:
 		return castError(reflect.TypeOf(val).String(), reflectTypeMap.String())
 	}
 
 	// Create a LIST of STRUCT values.
-	i := 0
-	list := make([]any, len(m))
-	for key, value := range m {
-		list[i] = map[string]any{mapKeysField(): key, mapValuesField(): value}
-		i++
+	list := make([]any, m.Len())
+	keys := m.Keys()
+	vals := m.Values()
+	for i := range keys {
+		list[i] = map[string]any{mapKeysField(): keys[i], mapValuesField(): vals[i]}
 	}
 
 	return setList(vec, rowIdx, list)
@@ -457,8 +493,9 @@ func setUnion[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 	}
 }
 
+//nolint:gocyclo
 func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
-	name, inMap := unsupportedTypeToStringMap[vec.Type]
+	name, inMap := unsupportedValueTypeToStringMap[vec.Type]
 	if inMap {
 		return unsupportedTypeError(name)
 	}
@@ -502,8 +539,10 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setBignum(vec, rowIdx, val)
 	case TYPE_VARCHAR:
 		return setBytes(vec, rowIdx, val)
-	case TYPE_BLOB:
+	case TYPE_BLOB, TYPE_GEOMETRY:
 		return setBytes(vec, rowIdx, val)
+	case TYPE_BIT:
+		return setBit(vec, rowIdx, val)
 	case TYPE_DECIMAL:
 		return setDecimal(vec, rowIdx, val)
 	case TYPE_ENUM:
@@ -512,9 +551,11 @@ func setVectorVal[S any](vec *vector, rowIdx mapping.IdxT, val S) error {
 		return setList(vec, rowIdx, val)
 	case TYPE_STRUCT:
 		return setStruct(vec, rowIdx, val)
-	case TYPE_MAP, TYPE_ARRAY:
+	case TYPE_MAP:
+		return setMap(vec, rowIdx, val)
+	case TYPE_ARRAY:
 		// FIXME: Is this already supported? And tested?
-		return unsupportedTypeError(unsupportedTypeToStringMap[vec.Type])
+		return unsupportedTypeError(typeToStringMap[vec.Type])
 	case TYPE_UUID:
 		return setUUID(vec, rowIdx, val)
 	case TYPE_UNION:

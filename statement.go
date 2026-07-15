@@ -2,6 +2,7 @@ package duckdb
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -282,7 +283,7 @@ func (s *Stmt) bindJSON(val driver.NamedValue, n int) (mapping.State, error) {
 func (s *Stmt) bindUUID(val driver.NamedValue, n int) (mapping.State, error) {
 	// Check if the interface contains a nil pointer using reflection
 	v := reflect.ValueOf(val.Value)
-	if v.Kind() == reflect.Ptr && v.IsNil() {
+	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
 	}
 
@@ -293,7 +294,19 @@ func (s *Stmt) bindUUID(val driver.NamedValue, n int) (mapping.State, error) {
 	return mapping.StateError, addIndexToError(unsupportedTypeError(unknownTypeErrMsg), n+1)
 }
 
-// Used for binding Array, List, Struct. In the future, also Map and Union
+func (s *Stmt) bindBit(val *Bit, n int) (mapping.State, error) {
+	if err := val.Validate(); err != nil {
+		return mapping.StateError, err
+	}
+	bit := mapping.NewBit(val.Data)
+	defer mapping.DestroyBit(&bit)
+	v := mapping.CreateBit(bit)
+	defer mapping.DestroyValue(&v)
+	state := mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), v)
+	return state, nil
+}
+
+// Used for binding Array, List, Struct, Map. In the future, Union.
 func (s *Stmt) bindCompositeValue(val driver.NamedValue, n int) (mapping.State, error) {
 	lt, err := s.paramLogicalType(n + 1)
 	defer mapping.DestroyLogicalType(&lt)
@@ -338,9 +351,9 @@ func (s *Stmt) bindComplexValue(val driver.NamedValue, n int, t Type, name strin
 		return s.bindDate(val, n)
 	case TYPE_TIME, TYPE_TIME_TZ:
 		return s.bindTime(val, t, n)
-	case TYPE_ARRAY, TYPE_LIST, TYPE_STRUCT:
+	case TYPE_ARRAY, TYPE_LIST, TYPE_STRUCT, TYPE_MAP:
 		return s.bindCompositeValue(val, n)
-	case TYPE_MAP, TYPE_ENUM, TYPE_UNION:
+	case TYPE_ENUM, TYPE_UNION:
 		// FIXME: for other types: duckdb_param_logical_type once available, then create duckdb_value + duckdb_bind_value
 		// FIXME: for other types: use NamedValueChecker to support.
 		return mapping.StateError, addIndexToError(unsupportedTypeError(name), n+1)
@@ -348,8 +361,49 @@ func (s *Stmt) bindComplexValue(val driver.NamedValue, n int, t Type, name strin
 	return mapping.StateError, addIndexToError(unsupportedTypeError(unknownTypeErrMsg), n+1)
 }
 
+func (s *Stmt) bindTypedValue(val TypedValue, n int) (mapping.State, error) {
+	value := val.value
+	// Unwrap driver.Valuer unless the caller already signalled NULL.
+	// Calling Value() on a typed-nil receiver can panic.
+	if val.typ != TYPE_SQLNULL && !isNil(value) {
+		if valuer, ok := value.(driver.Valuer); ok {
+			driverVal, err := valuer.Value()
+			if err != nil {
+				return mapping.StateError, addIndexToError(err, n+1)
+			}
+			value = driverVal
+		}
+	}
+
+	coerced, err := coerceTypedValue(val.typ, value)
+	if err != nil {
+		return mapping.StateError, addIndexToError(err, n+1)
+	}
+	if coerced == nil {
+		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+	}
+
+	mappedVal, err := createPrimitiveValue(val.typ, coerced)
+	defer mapping.DestroyValue(&mappedVal)
+	if err != nil {
+		return mapping.StateError, addIndexToError(err, n+1)
+	}
+
+	return mapping.BindValue(*s.preparedStmt, mapping.IdxT(n+1), mappedVal), nil
+}
+
 //nolint:gocyclo
 func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
+	switch explicit := val.Value.(type) {
+	case TypedValue:
+		return s.bindTypedValue(explicit, n)
+	case *TypedValue:
+		if explicit == nil {
+			return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+		}
+		return s.bindTypedValue(*explicit, n)
+	}
+
 	// For some queries, we cannot resolve the parameter type when preparing the query.
 	// E.g., for "SELECT * FROM (VALUES (?, ?)) t(a, b)", we cannot know the parameter types from the SQL statement alone.
 	// For these cases, ParamType returns TYPE_INVALID.
@@ -358,8 +412,13 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 		return mapping.StateError, err
 	}
 
-	name, ok := unsupportedTypeToStringMap[t]
+	name, ok := unsupportedValueTypeToStringMap[t]
 	if ok && t != TYPE_INVALID {
+		// TODO: DuckDB can coerce primitive scalar binds into VARIANT columns
+		// when callers use the low-level bind functions; duckdb-rs relies on
+		// that behavior. Keep this blocked until tests prove this path can
+		// delegate primitive binds without falling through to Go-side VARIANT
+		// value creation, which has no C API helpers yet.
 		return mapping.StateError, addIndexToError(unsupportedTypeError(name), n+1)
 	}
 
@@ -435,6 +494,13 @@ func (s *Stmt) bindValue(val driver.NamedValue, n int) (mapping.State, error) {
 			return mapping.StateError, inferErr
 		}
 		return mapping.BindInterval(*s.preparedStmt, mapping.IdxT(n+1), i), nil
+	case Bit:
+		return s.bindBit(&v, n)
+	case *Bit:
+		if v == nil {
+			return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
+		}
+		return s.bindBit(v, n)
 	case nil:
 		return mapping.BindNull(*s.preparedStmt, mapping.IdxT(n+1)), nil
 	}
@@ -456,6 +522,17 @@ func (s *Stmt) bind(args []driver.NamedValue) error {
 		return fmt.Errorf("incorrect argument count for command: have %d want %d", len(args), s.NumInput())
 	}
 
+	byOrdinal := make(map[int]driver.NamedValue, len(args))
+	byName := make(map[string]driver.NamedValue, len(args))
+	for _, v := range args {
+		if v.Ordinal != 0 {
+			byOrdinal[v.Ordinal] = v
+		}
+		if v.Name != "" {
+			byName[v.Name] = v
+		}
+	}
+
 	// relaxed length check allow for unused parameters.
 	for i := range s.NumInput() {
 		name := mapping.ParameterName(*s.preparedStmt, mapping.IdxT(i+1))
@@ -464,17 +541,13 @@ func (s *Stmt) bind(args []driver.NamedValue) error {
 		arg := args[i]
 
 		// override with ordinal if set
-		for _, v := range args {
-			if v.Ordinal == i+1 {
-				arg = v
-			}
+		if v, ok := byOrdinal[i+1]; ok {
+			arg = v
 		}
 
 		// override with name if set
-		for _, v := range args {
-			if v.Name == name {
-				arg = v
-			}
+		if v, ok := byName[name]; ok {
+			arg = v
 		}
 
 		state, err := s.bindValue(arg, i)
@@ -685,6 +758,23 @@ func (s *Stmt) execute(ctx context.Context, args []driver.NamedValue) (*mapping.
 	return s.executeBound(ctx)
 }
 
+// interruptRoutine sends at most one interrupt when ctx is canceled before
+// mainDoneCh closes. Query execution uses runWithCtxInterrupt when it needs to
+// reassert interrupts on a timer.
+func interruptRoutine(mainDoneCh, bgDoneCh *chan struct{}, ctx context.Context, conn *Conn) {
+	select {
+	// Await an interrupt on the context.
+	case <-ctx.Done():
+		mapping.Interrupt(conn.conn)
+		break
+	// Await a done-signal on the main channel.
+	// Reading from a closed channel succeeds immediately.
+	case <-*mainDoneCh:
+		break
+	}
+	close(*bgDoneCh)
+}
+
 func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 	var pendingRes mapping.PendingResult
 	// Phase 1: create pending result
@@ -715,6 +805,10 @@ func (s *Stmt) executeBound(ctx context.Context) (*mapping.Result, error) {
 func argsToNamedArgs(values []driver.Value) []driver.NamedValue {
 	args := make([]driver.NamedValue, len(values))
 	for n, param := range values {
+		if np, ok := param.(sql.NamedArg); ok {
+			args[n].Name = np.Name
+			param = np.Value
+		}
 		args[n].Value = param
 		args[n].Ordinal = n + 1
 	}
