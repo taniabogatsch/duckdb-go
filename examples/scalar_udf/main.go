@@ -153,9 +153,9 @@ func wrapSumScalarUDF() {
 	check(db.Close())
 }
 
-// chunkSum demonstrates the ChunkContextExecutor API for batch processing.
-// It computes the sum of two integer columns using chunk-based access.
-// This is more efficient than row-by-row processing for large datasets.
+// chunkSum demonstrates the ChunkContextExecutor API for scalar UDFs.
+// It computes the sum of two integer columns using a chunk-based callback API.
+// This is more efficient than the row-based callback API, but it does not yet implement vectorized processing.
 
 type chunkSum struct{}
 
@@ -172,14 +172,16 @@ func (*chunkSum) Config() duckdb.ScalarFuncConfig {
 func (*chunkSum) Executor() duckdb.ScalarFuncExecutor {
 	return duckdb.ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *duckdb.ChunkIteratorState) error {
-			rs, onFinish := chunk.Rows()
-			for row := range rs {
-				res := row.Args[0].(int32) + row.Args[1].(int32)
-				if err := row.SetResult(res); err != nil {
+			for row, err := range chunk.Rows() {
+				if err != nil {
+					return err
+				}
+				res := row.GetValue(0).(int32) + row.GetValue(1).(int32)
+				if err = row.SetResult(res); err != nil {
 					return err
 				}
 			}
-			return onFinish()
+			return nil
 		},
 	}
 }

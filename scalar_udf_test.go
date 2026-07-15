@@ -764,14 +764,16 @@ func (*chunkSumSUDF) Config() ScalarFuncConfig {
 func (*chunkSumSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
-			rs, onFinish := chunk.Rows()
-			for row := range rs {
-				res := row.Args[0].(int32) + row.Args[1].(int32)
-				if err := row.SetResult(res); err != nil {
+			for row, err := range chunk.Rows() {
+				if err != nil {
+					return err
+				}
+				res := row.GetValue(0).(int32) + row.GetValue(1).(int32)
+				if err = row.SetResult(res); err != nil {
 					return err
 				}
 			}
-			return onFinish()
+			return nil
 		},
 	}
 }
@@ -792,13 +794,15 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
 			}
 
-			rs, onFinish := chunk.Rows()
-			for row := range rs {
-				if err := row.SetResult(id); err != nil {
+			for row, err := range chunk.Rows() {
+				if err != nil {
+					return err
+				}
+				if err = row.SetResult(id); err != nil {
 					return err
 				}
 			}
-			return onFinish()
+			return nil
 		},
 	}
 }
@@ -811,20 +815,22 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
-			rs, onFinish := chunk.Rows()
-			for row := range rs {
-				val := row.Args[0]
+			for row, err := range chunk.Rows() {
+				if err != nil {
+					return err
+				}
+				val := row.GetValue(0)
 				if val == nil {
-					if err := row.SetResult(int32(-1)); err != nil {
+					if err = row.SetResult(int32(-1)); err != nil {
 						return err
 					}
 				} else {
-					if err := row.SetResult(val.(int32) * 2); err != nil {
+					if err = row.SetResult(val.(int32) * 2); err != nil {
 						return err
 					}
 				}
 			}
-			return onFinish()
+			return nil
 		},
 	}
 }
