@@ -826,12 +826,13 @@ func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
 		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
+			columnCount := chunk.ColumnCount()
 			for row, err := range chunk.Rows() {
 				if err != nil {
 					return err
 				}
-				val1 := row.GetValuePtr(0)
-				val2 := row.GetValuePtr(1)
+				val1 := row.GetValuePtr(columnCount - 2)
+				val2 := row.GetValuePtr(columnCount - 1)
 				res := int32(-1)
 				if *val1 != nil && *val2 != nil {
 					res = (*val1).(int32) + (*val2).(int32)

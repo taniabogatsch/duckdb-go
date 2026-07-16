@@ -28,6 +28,11 @@ func (iterState *ChunkIteratorState) GetValuePtr(colIdx int) *driver.Value {
 	return &iterState.args[colIdx]
 }
 
+// ColumnCount returns the number of input columns of the iterated chunk.
+func (iterState *ChunkIteratorState) ColumnCount() int {
+	return len(iterState.args)
+}
+
 // Rows is used to iterate over the rows of a data chunk, and to set the result of a
 // computation on a row in the output vector.
 func (iterState *ChunkIteratorState) Rows() iter.Seq2[*ChunkIteratorState, error] {
