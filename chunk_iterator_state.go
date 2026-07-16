@@ -46,7 +46,9 @@ func (iterState *ChunkIteratorState) Rows() iter.Seq2[*ChunkIteratorState, error
 				}
 				if iterState.args[colIdx] == nil {
 					hasNull = true
-					break
+					if iterState.nullInNullOut {
+						break
+					}
 				}
 			}
 

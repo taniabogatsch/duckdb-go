@@ -782,23 +782,34 @@ func (*chunkContextSUDF) Config() ScalarFuncConfig {
 	return ScalarFuncConfig{[]TypeInfo{}, currentInfo, nil, true, false}
 }
 
+func bindChunkExecutor(parentCtx context.Context, args []ScalarUDFArg) (context.Context, error) {
+	bindCtx := context.WithValue(parentCtx, testBindCtxKey, uint64(42))
+	return bindCtx, nil
+}
+
 func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 	return ScalarFuncExecutor{
+		ScalarBinder: bindChunkExecutor,
 		ChunkContextExecutor: func(ctx context.Context, chunk *ChunkIteratorState) error {
 			if ctx == nil {
 				return errors.New("context is nil for chunkContextSUDF")
 			}
 
-			id, ok := ctx.Value(testCtxKey).(uint64)
+			connId, ok := ctx.Value(testCtxKey).(uint64)
 			if !ok {
 				return errors.New("context does not contain the connection id for chunkContextSUDF")
+			}
+
+			bindId, ok := ctx.Value(testBindCtxKey).(uint64)
+			if !ok {
+				return errors.New("context does not contain the bind id for chunkContextSUDF")
 			}
 
 			for row, err := range chunk.Rows() {
 				if err != nil {
 					return err
 				}
-				if err = row.SetResult(id); err != nil {
+				if err = row.SetResult(connId + bindId); err != nil {
 					return err
 				}
 			}
@@ -809,7 +820,7 @@ func (*chunkContextSUDF) Executor() ScalarFuncExecutor {
 
 func (*chunkNullHandlingSUDF) Config() ScalarFuncConfig {
 	// SpecialNullHandling: true means user handles NULLs manually
-	return ScalarFuncConfig{[]TypeInfo{currentInfo}, currentInfo, nil, false, true}
+	return ScalarFuncConfig{[]TypeInfo{currentInfo, currentInfo}, currentInfo, nil, false, true}
 }
 
 func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
@@ -819,13 +830,23 @@ func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 				if err != nil {
 					return err
 				}
-				val := row.GetValuePtr(0)
-				if *val == nil {
-					if err = row.SetResult(int32(-1)); err != nil {
+				val1 := row.GetValuePtr(0)
+				val2 := row.GetValuePtr(1)
+				if *val1 != nil && *val2 != nil {
+					res := (*val1).(int32) + (*val2).(int32)
+					if err = row.SetResult(res); err != nil {
+						return err
+					}
+				} else if *val1 != nil {
+					if err = row.SetResult(*val1); err != nil {
+						return err
+					}
+				} else if *val2 != nil {
+					if err = row.SetResult(*val2); err != nil {
 						return err
 					}
 				} else {
-					if err = row.SetResult((*val).(int32) * 2); err != nil {
+					if err = row.SetResult(-1); err != nil {
 						return err
 					}
 				}
@@ -914,10 +935,14 @@ func TestChunkScalarUDFSpecialNullHandling(t *testing.T) {
 	db := openDbWrapper(t, ``)
 	defer closeDbWrapper(t, db)
 
+	// Create a table for consecutive rows.
+	createTable(t, db, `CREATE TABLE foo(bar INTEGER, baz INTEGER)`)
+	_, err := db.Exec(`INSERT INTO foo VALUES (42, 43), (NULL, 1), (100, NULL), (300, 400), (NULL, NULL)`)
+	require.NoError(t, err)
+
 	conn := openConnWrapper(t, db, context.Background())
 	defer closeConnWrapper(t, conn)
 
-	var err error
 	currentInfo, err = NewTypeInfo(TYPE_INTEGER)
 	require.NoError(t, err)
 
@@ -926,14 +951,19 @@ func TestChunkScalarUDFSpecialNullHandling(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test user-managed NULL handling.
-	var res int32
-	row := db.QueryRow(`SELECT chunk_null_handler(5)`)
-	require.NoError(t, row.Scan(&res))
-	require.Equal(t, int32(10), res)
+	res, err := db.Query(`SELECT chunk_null_handler(bar, baz) FROM foo`)
+	require.NoError(t, err)
+	defer closeRowsWrapper(t, res)
 
-	row = db.QueryRow(`SELECT chunk_null_handler(NULL)`)
-	require.NoError(t, row.Scan(&res))
-	require.Equal(t, int32(-1), res)
+	var output int32
+	i := 0
+	expected := []int32{85, 1, 100, 700, -1}
+	for res.Next() {
+		err = res.Scan(&output)
+		require.NoError(t, err)
+		require.Equal(t, expected[i], output)
+		i++
+	}
 }
 
 func TestChunkScalarUDFContext(t *testing.T) {
@@ -957,7 +987,7 @@ func TestChunkScalarUDFContext(t *testing.T) {
 	var res uint64
 	row := conn.QueryRowContext(ctx, `SELECT chunk_get_conn_id()`)
 	require.NoError(t, row.Scan(&res))
-	require.Equal(t, connId, res)
+	require.Equal(t, connId+42, res)
 }
 
 func TestChunkScalarUDFError(t *testing.T) {

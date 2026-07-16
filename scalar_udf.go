@@ -125,21 +125,27 @@ func (s *scalarFuncContext) RowExecutor(info *bindData) (RowExecutorFn, error) {
 		return e.RowExecutor, nil
 	}
 
-	// Parent context cancellation propagates to children,
-	// therefore, it is enough to check the child context here.
-	if info.ctx != nil {
-		if err := info.ctx.Err(); err != nil {
-			return nil, err
-		}
-	} else {
-		// No child context means that there is no custom bind function.
-		// Retrieve the parent context from the connection context store.
-		info.ctx = s.ctxStore.load(info.connId)
+	if err := s.setCtx(info); err != nil {
+		return nil, err
 	}
 
 	return func(values []driver.Value) (any, error) {
 		return e.RowContextExecutor(info.ctx, values)
 	}, nil
+}
+
+func (s *scalarFuncContext) setCtx(info *bindData) error {
+	// Parent context cancellation propagates to children,
+	// therefore, it is enough to check the child context here.
+	if info.ctx == nil {
+		// No child context means that there is no custom bind function.
+		// Retrieve the parent context from the connection context store.
+		info.ctx = s.ctxStore.load(info.connId)
+		return nil
+	}
+	// Return any potential context error.
+	// If the error is not nil, then set it in the function info outside of this function.
+	return info.ctx.Err()
 }
 
 // RegisterScalarUDF registers a user-defined scalar function.
@@ -291,8 +297,11 @@ func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	inputChunk, outputChunk *DataChunk,
 	functionInfo mapping.FunctionInfo, nullInNullOut bool,
 ) {
-	// Get context.
-	ctx := funcCtx.ctxStore.load(bindInfo.connId)
+	// Set the context.
+	if err := funcCtx.setCtx(bindInfo); err != nil {
+		mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
+		return
+	}
 
 	// Create chunk wrapper.
 	// When nullInNullOut is enabled, the Rows() iterator automatically skips
@@ -308,7 +317,7 @@ func executeChunk(funcCtx *scalarFuncContext, bindInfo *bindData,
 	}
 
 	// Execute - user iterates over rows, each row has pre-fetched Args.
-	if err := funcCtx.f.Executor().ChunkContextExecutor(ctx, chunk); err != nil {
+	if err := funcCtx.f.Executor().ChunkContextExecutor(bindInfo.ctx, chunk); err != nil {
 		mapping.ScalarFunctionSetError(functionInfo, getError(errAPI, err).Error())
 		return
 	}
