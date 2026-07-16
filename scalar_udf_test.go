@@ -832,23 +832,16 @@ func (*chunkNullHandlingSUDF) Executor() ScalarFuncExecutor {
 				}
 				val1 := row.GetValuePtr(0)
 				val2 := row.GetValuePtr(1)
+				res := int32(-1)
 				if *val1 != nil && *val2 != nil {
-					res := (*val1).(int32) + (*val2).(int32)
-					if err = row.SetResult(res); err != nil {
-						return err
-					}
+					res = (*val1).(int32) + (*val2).(int32)
 				} else if *val1 != nil {
-					if err = row.SetResult(*val1); err != nil {
-						return err
-					}
+					res = (*val1).(int32)
 				} else if *val2 != nil {
-					if err = row.SetResult(*val2); err != nil {
-						return err
-					}
-				} else {
-					if err = row.SetResult(-1); err != nil {
-						return err
-					}
+					res = (*val2).(int32)
+				}
+				if err = row.SetResult(res); err != nil {
+					return err
 				}
 			}
 			return nil
