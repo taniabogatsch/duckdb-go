@@ -207,9 +207,12 @@ func (vec *vector) getBit(rowIdx mapping.IdxT) Bit {
 }
 
 func (vec *vector) getJSON(rowIdx mapping.IdxT) (any, error) {
-	bytes := vec.getBytes(rowIdx).(string)
+	data, ok := vec.getBytes(rowIdx).(string)
+	if !ok {
+		return nil, errInternal
+	}
 	var value any
-	if err := json.Unmarshal([]byte(bytes), &value); err != nil {
+	if err := json.Unmarshal([]byte(data), &value); err != nil {
 		return nil, err
 	}
 	return value, nil
