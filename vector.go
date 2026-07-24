@@ -346,7 +346,7 @@ func (vec *vector) initJSON() {
 		if vec.getNull(rowIdx) {
 			return nil, nil
 		}
-		return vec.getJSON(rowIdx), nil
+		return vec.getJSON(rowIdx)
 	}
 	vec.setFn = func(vec *vector, rowIdx mapping.IdxT, val any) error {
 		if val == nil {

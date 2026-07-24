@@ -206,11 +206,16 @@ func (vec *vector) getBit(rowIdx mapping.IdxT) Bit {
 	return Bit{Data: []byte(str)}
 }
 
-func (vec *vector) getJSON(rowIdx mapping.IdxT) any {
-	bytes := vec.getBytes(rowIdx).(string)
+func (vec *vector) getJSON(rowIdx mapping.IdxT) (any, error) {
+	data, ok := vec.getBytes(rowIdx).(string)
+	if !ok {
+		return nil, errInternal
+	}
 	var value any
-	_ = json.Unmarshal([]byte(bytes), &value)
-	return value
+	if err := json.Unmarshal([]byte(data), &value); err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 func (vec *vector) getDecimal(rowIdx mapping.IdxT) (Decimal, error) {
